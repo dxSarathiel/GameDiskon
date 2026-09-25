@@ -97,11 +97,11 @@ def ambil_diskon_steam(state):
             d = kandidat[appid]
             hasil.append({
                 "kunci": kunci,
-                "judul": d["title"],
+                "judul": " ".join(d["title"].split()),
                 "diskon": harga["discount_percent"],
                 "harga_awal": harga["initial"],
                 "harga_akhir": harga["final"],
-                "rating": d["steamRatingText"],
+                "rating": f"{int(d['steamRatingPercent'])}%",
                 "url": f"https://store.steampowered.com/app/{appid}/",
             })
         time.sleep(1.5)  # sopan ke server Steam
@@ -153,7 +153,7 @@ def susun_pesan(epic, steam):
         for g in steam:
             baris.append(
                 f'• <a href="{g["url"]}">{escape(g["judul"])}</a> — <b>-{g["diskon"]}%</b> '
-                f'{rupiah(g["harga_akhir"])} <s>{rupiah(g["harga_awal"])}</s> · {escape(g["rating"])}'
+                f'{rupiah(g["harga_akhir"])} <s>{rupiah(g["harga_awal"])}</s> · 👍 {g["rating"]}'
             )
     return "\n".join(baris).strip()
 
