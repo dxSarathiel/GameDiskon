@@ -1,5 +1,6 @@
 """
-Membuat halaman web statis (docs/index.html) untuk GitHub Pages.
+Membuat halaman web statis (docs/index.html, sitemap.xml, robots.txt)
+yang di-upload ke hosting gamediskon.my.id.
 Halaman menampilkan SEMUA diskon yang layak hari ini (bukan hanya yang baru
 diposting), jadi selalu lengkap walaupun channel hari itu hanya memposting sedikit.
 """
@@ -271,15 +272,19 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
     with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as f:
         f.write(html)
 
-    # Jangan proses dengan Jekyll: lebih cepat dan tidak ada aturan nama file yang aneh
+    # File penanda lama dari masa GitHub Pages; tidak dipakai di hosting, tapi tidak mengganggu
     open(os.path.join(folder, ".nojekyll"), "w").close()
 
-   if situs:
+    if situs:
         with open(os.path.join(folder, "sitemap.xml"), "w", encoding="utf-8") as f:
             f.write(
-                ...
+                '<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                f"  <url><loc>{situs}</loc><lastmod>{sekarang:%Y-%m-%d}</lastmod></url>\n"
+                "</urlset>\n"
             )
         # robots.txt: izinkan semua mesin pencari dan tunjukkan lokasi sitemap
         with open(os.path.join(folder, "robots.txt"), "w", encoding="utf-8") as f:
             f.write(f"User-agent: *\nAllow: /\n\nSitemap: {situs}sitemap.xml\n")
+
     return os.path.join(folder, "index.html")
