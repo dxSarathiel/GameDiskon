@@ -1,5 +1,5 @@
 """
-Radar Diskon Game — v4 (riwayat harga Rupiah + gambar ringkasan + halaman web)
+Radar Diskon Game — v5 (riwayat harga + gambar + halaman web + penanda event sale)
 Sumber data (semua gratis, tanpa API key):
   1. CheapShark  -> daftar kandidat diskon Steam yang ratingnya bagus
   2. Steam       -> cek harga ASLI di region Indonesia (Rupiah)
@@ -20,7 +20,15 @@ from html import escape, unescape
 import requests
 
 from gambar import buat_gambar
-from halaman import buat_halaman, url_situs
+try:
+    from halaman import buat_halaman, url_situs
+except Exception as err:
+    # Kesalahan di halaman.py tidak boleh menghentikan posting Telegram
+    print("halaman.py bermasalah, halaman web dilewati:", err)
+    buat_halaman = None
+
+    def url_situs():
+        return ""
 
 # ---------- Pengaturan (ubah sesuai selera) ----------
 MIN_DISKON_PERSEN = 50      # diskon minimal di harga Indonesia
@@ -36,10 +44,19 @@ MIN_HARI_DATA = 30          # label "terendah" baru muncul setelah data game >= 
 NAMA_CHANNEL = "Kumpulan Game Diskon"  # tampil di bagian atas gambar
 KIRIM_GAMBAR = True                     # ubah ke False untuk kembali ke teks saja
 BUAT_HALAMAN = True                     # halaman web harian untuk GitHub Pages (folder docs)
-TAMPILKAN_LINK_WEB = False              # ubah ke True SETELAH GitHub Pages aktif
-GOOGLE_VERIFIKASI = "NeGuLjS_j7yta3znaeJWo-JRiksuR9yDI_F7atB-RqU"                  # isi kode dari Google Search Console (opsional)
+TAMPILKAN_LINK_WEB = True              # ubah ke True SETELAH GitHub Pages aktif
+GOOGLE_VERIFIKASI = "NeGuLjS_j7yta3znaeJWo-JRiksuR9yDI_F7atB-RqU" # isi kode dari Google Search Console (opsional)
 
-USER_AGENT = "RadarDiskonGameID/0.4 (github.com/dxSarathiel/GameDiskon)"  # ganti USERNAME
+# ---------- Event sale besar ----------
+# Tanggal dari jadwal resmi Steamworks. Tambahkan event baru dengan format yang sama.
+EVENT_SALE = [
+    {"nama": "Steam Autumn Sale 2026", "mulai": "2026-10-01", "selesai": "2026-10-08", "emoji": "🍂"},
+    {"nama": "Steam Winter Sale 2026", "mulai": "2026-12-17", "selesai": "2027-01-04", "emoji": "❄️"},
+]
+HARI_PENGUMUMAN_EVENT = 3   # mulai diumumkan sekian hari sebelum event
+MAKS_ITEM_STEAM_EVENT = 12  # jumlah game Steam per posting selama event berlangsung
+
+USER_AGENT = "RadarDiskonGameID/0.5 (github.com/dxSarathiel/GameDiskon)"  # ganti USERNAME
 STATE_FILE = "sent.json"
 RIWAYAT_FILE = "harga_idr.json"
 GAMBAR_FILE = "radar.jpg"
@@ -83,6 +100,51 @@ def simpan_state(state):
 def rupiah(nilai_sen):
     # Steam memberi harga dalam "sen": 26950000 -> Rp 269.500
     return "Rp " + f"{nilai_sen // 100:,}".replace(",", ".")
+
+
+# ---------- Event sale ----------
+BULAN_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
+            "Agustus", "September", "Oktober", "November", "Desember"]
+
+
+def _tgl(iso):
+    return datetime.strptime(iso, "%Y-%m-%d")
+
+
+def _periode(mulai, selesai):
+    """1–8 Oktober 2026  /  17 Desember 2026 – 4 Januari 2027"""
+    if mulai.year != selesai.year:
+        return (f"{mulai.day} {BULAN_ID[mulai.month - 1]} {mulai.year} – "
+                f"{selesai.day} {BULAN_ID[selesai.month - 1]} {selesai.year}")
+    if mulai.month != selesai.month:
+        return (f"{mulai.day} {BULAN_ID[mulai.month - 1]} – "
+                f"{selesai.day} {BULAN_ID[selesai.month - 1]} {selesai.year}")
+    return f"{mulai.day}–{selesai.day} {BULAN_ID[mulai.month - 1]} {mulai.year}"
+
+
+def event_hari_ini():
+    """Event yang sedang berlangsung, atau yang akan dimulai dalam HARI_PENGUMUMAN_EVENT hari.
+    Kembalikan dict berisi status "berlangsung"/"segera", atau None."""
+    hari_ini = _tgl(HARI_INI)
+    for ev in EVENT_SALE:
+        mulai, selesai = _tgl(ev["mulai"]), _tgl(ev["selesai"])
+        # Sale Steam biasanya dimulai pagi waktu Pasifik = sekitar tengah malam WIB,
+        # jadi saat bot posting pukul 18.00 WIB di tanggal mulai, sale kemungkinan belum aktif.
+        # Karena itu status "berlangsung" baru dipakai sejak hari berikutnya.
+        if mulai < hari_ini <= selesai:
+            status = "berlangsung"
+        elif timedelta(0) <= mulai - hari_ini <= timedelta(days=HARI_PENGUMUMAN_EVENT):
+            status = "segera"
+        else:
+            continue
+        return {
+            "nama": ev["nama"],
+            "emoji": ev.get("emoji", "🔥"),
+            "status": status,
+            "periode": _periode(mulai, selesai),
+            "mulai_teks": f"{mulai.day} {BULAN_ID[mulai.month - 1]} {mulai.year}",
+        }
+    return None
 
 
 # ---------- Riwayat harga ----------
@@ -199,7 +261,9 @@ def proses_steam(state, riwayat):
     # Yang harganya terendah tercatat didahulukan, lalu yang diskonnya terbesar
     layak.sort(key=lambda x: (x["terendah_sejak"] is not None, x["diskon"]), reverse=True)
     baru = [g for g in layak if g["kunci"] not in state]
-    return baru[:MAKS_ITEM_STEAM], layak, len(harga_idr)
+    ev = event_hari_ini()
+    batas = MAKS_ITEM_STEAM_EVENT if ev and ev["status"] == "berlangsung" else MAKS_ITEM_STEAM
+    return baru[:batas], layak, len(harga_idr)
 
 
 # ---------- Sumber 3: Epic gratis ----------
@@ -237,7 +301,13 @@ def tanggal_pendek(iso):
 
 
 def susun_pesan(epic, steam):
-    baris = [f"🎮 <b>Radar Diskon Game</b> — {datetime.now(WIB):%d/%m/%Y}", ""]
+    baris = [f"🎮 <b>Radar Diskon Game</b> — {datetime.now(WIB):%d/%m/%Y}"]
+    ev = event_hari_ini()
+    if ev and ev["status"] == "berlangsung":
+        baris.append(f'{ev["emoji"]} <b>{escape(ev["nama"])}</b> sedang berlangsung ({ev["periode"]})')
+    elif ev:
+        baris.append(f'⏳ {escape(ev["nama"])} dimulai {ev["mulai_teks"]}')
+    baris.append("")
     if epic:
         baris.append("🆓 <b>GRATIS di Epic</b>")
         for g in epic:
@@ -325,10 +395,11 @@ def main():
         print("Steam/CheapShark gagal:", err)
 
     # Halaman web juga diperbarui setiap hari, termasuk hari tanpa posting baru
-    if BUAT_HALAMAN and (epic_semua or steam_layak):
+    if BUAT_HALAMAN and buat_halaman and (epic_semua or steam_layak):
         try:
             path = buat_halaman(epic_semua, steam_layak, link_telegram=link_channel(),
-                                nama_channel=NAMA_CHANNEL, google_verifikasi=GOOGLE_VERIFIKASI)
+                                nama_channel=NAMA_CHANNEL, google_verifikasi=GOOGLE_VERIFIKASI,
+                                event=event_hari_ini())
             print(f"Halaman web diperbarui: {path} ({len(steam_layak)} diskon Steam, {len(epic_semua)} gratis Epic)")
         except Exception as err:
             print("Halaman web gagal dibuat:", err)
@@ -340,8 +411,10 @@ def main():
     path_gambar = None
     if KIRIM_GAMBAR:
         try:
+            ev = event_hari_ini()
+            label_event = ev["nama"] if ev and ev["status"] == "berlangsung" else ""
             path_gambar = buat_gambar(epic, steam, GAMBAR_FILE, session,
-                                      NAMA_CHANNEL, link_channel())
+                                      NAMA_CHANNEL, link_channel(), label_event)
         except Exception as err:
             print("Gambar gagal dibuat, kirim teks saja:", err)
 
