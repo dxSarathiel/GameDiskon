@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cara Klaim Game Gratis di Epic Games Store Setiap Minggu</title>
+<meta name="description" content="Panduan lengkap klaim game gratis mingguan Epic Games Store dari Indonesia: jadwal dalam WIB, langkah klaim lewat PC atau HP, dan cara supaya tidak pernah ketinggalan.">
+<link rel="canonical" href="https://gamediskon.my.id/panduan/cara-klaim-game-gratis-epic-games/">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Cara Klaim Game Gratis di Epic Games Store Setiap Minggu">
+<meta property="og:description" content="Panduan lengkap klaim game gratis mingguan Epic Games Store dari Indonesia: jadwal dalam WIB, langkah klaim lewat PC atau HP, dan cara supaya tidak pernah ketinggalan.">
+<meta property="og:url" content="https://gamediskon.my.id/panduan/cara-klaim-game-gratis-epic-games/">
+
+<meta name="theme-color" content="#14161f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --latar: #14161f; --panel: #1d202b; --garis: #2a2e3b;
+    --teks: #f5f5f7; --redup: #9aa0b0;
+    --oranye: #ff6b35; --hijau: #2ecc71;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--latar); color: var(--teks);
+         font: 400 1rem/1.6 "Poppins", system-ui, sans-serif; }
+  a { color: inherit; }
+  a:focus-visible { outline: 3px solid var(--oranye); outline-offset: 3px; border-radius: 4px; }
+  .wadah { max-width: 60rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+  .jejak { font-size: .9rem; color: var(--redup); margin: 0 0 2rem; }
+  .jejak ol { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; }
+  .jejak li + li::before { content: "/"; margin-right: .4rem; color: var(--garis); }
+  .jejak a { text-decoration: none; }
+  .jejak a:hover { color: var(--teks); }
+
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.6rem); line-height: 1.15; margin: 0 0 1.5rem; max-width: 22ch; }
+  h2 { font-size: 1.35rem; line-height: 1.25; margin: 0 0 .25rem; }
+  section { margin-bottom: 3rem; }
+  .catatan { color: var(--redup); margin: .25rem 0 1.25rem; max-width: 65ch; }
+
+  /* Bagian atas: sampul + label harga besar, bentuk label sama dengan logo channel */
+  .utama { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1.75rem; align-items: center; margin-bottom: 1.5rem; }
+  .utama img { display: block; width: 100%; height: auto; aspect-ratio: 460 / 215; border-radius: .6rem; background: var(--panel); }
+  .label-besar {
+    display: inline-flex; align-items: baseline; gap: .8rem; flex-wrap: wrap;
+    background: var(--panel); padding: .9rem 1.4rem .9rem 2.4rem;
+    clip-path: polygon(1.3rem 0, 100% 0, 100% 100%, 1.3rem 100%, 0 50%);
+    border-radius: 0 .6rem .6rem 0;
+  }
+  .label-besar.diskon { background: var(--oranye); color: #fff; }
+  .label-besar strong { font-size: clamp(1.6rem, 4vw, 2.2rem); line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .label-besar span { font-weight: 700; }
+  .label-besar s { opacity: .85; font-variant-numeric: tabular-nums; }
+  .kalimat { margin: 1rem 0 0; max-width: 55ch; }
+  .kalimat.baik { color: var(--hijau); font-weight: 500; }
+  .tombol { display: inline-block; margin-top: 1.25rem; background: var(--oranye); color: #fff; text-decoration: none;
+            font-weight: 700; padding: .75rem 1.3rem; border-radius: .6rem; }
+  .tombol:hover { background: #ff7d4d; }
+  .tombol.kedua { background: transparent; color: var(--teks); border: 2px solid var(--garis); margin-left: .5rem; }
+  .tombol.kedua:hover { border-color: var(--oranye); }
+
+  .fakta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 0 3rem; border-top: 1px solid var(--garis); border-bottom: 1px solid var(--garis); }
+  .fakta div { padding: 1rem 1rem 1rem 0; }
+  .fakta div + div { padding-left: 1rem; border-left: 1px solid var(--garis); }
+  .fakta dt { color: var(--redup); font-size: .9rem; }
+  .fakta dd { margin: .15rem 0 0; font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .fakta dd small { display: block; font-weight: 400; font-size: .85rem; color: var(--redup); }
+
+  .peringatan { background: var(--panel); border-left: 4px solid var(--oranye); border-radius: 0 .6rem .6rem 0;
+                padding: .8rem 1rem; margin: 0 0 2rem; max-width: 65ch; }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: .7rem .5rem .7rem 0; border-bottom: 1px solid var(--garis); }
+  th { color: var(--redup); font-weight: 500; font-size: .9rem; }
+  td.angka, th.angka { text-align: right; padding-right: 0; }
+  .potong { color: var(--oranye); font-weight: 700; }
+
+  /* Daftar semua game */
+  .daftar { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--garis); }
+  .daftar li { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem 0; border-bottom: 1px solid var(--garis); }
+  .daftar a { text-decoration: none; }
+  .daftar a:hover { text-decoration: underline; text-decoration-color: var(--oranye); text-underline-offset: 3px; }
+  .daftar .harga { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  footer { color: var(--redup); font-size: .85rem; border-top: 1px solid var(--garis); padding-top: 1.5rem; }
+  .tautan-kaki { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin: 0 0 1rem; padding: 0; }
+  .tautan-kaki a { text-underline-offset: 3px; }
+  .tautan-kaki a:hover { color: var(--teks); }
+
+  @media (max-width: 40rem) {
+    .utama { grid-template-columns: 1fr; }
+    .fakta { grid-template-columns: 1fr; }
+    .fakta div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--garis); }
+    .tombol.kedua { margin-left: 0; }
+  }
+
+  .prosa { max-width: 68ch; }
+  .prosa .meta { color: var(--redup); font-size: .95rem; margin: -.75rem 0 2rem; }
+  .prosa h2 { font-size: 1.4rem; margin: 2.5rem 0 .6rem; }
+  .prosa h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  .prosa p, .prosa ul, .prosa ol { margin: 0 0 1.1rem; }
+  .prosa ul, .prosa ol { padding-left: 1.3rem; }
+  .prosa li { margin-bottom: .45rem; }
+  .prosa li::marker { color: var(--oranye); font-weight: 700; }
+  .prosa a { color: var(--oranye); text-underline-offset: 3px; }
+  .prosa strong { color: #fff; }
+  .prosa blockquote { margin: 0 0 1.25rem; padding: .8rem 1.1rem; background: var(--panel);
+                      border-left: 4px solid var(--oranye); border-radius: 0 .6rem .6rem 0; }
+  .prosa blockquote p:last-child { margin-bottom: 0; }
+  .prosa table { margin: 0 0 1.25rem; }
+  .prosa .kotak-data { background: var(--panel); border-radius: .8rem; padding: 1rem 1.2rem; margin: 0 0 1.25rem; }
+  .prosa .kotak-data p { margin: 0 0 .5rem; color: var(--redup); font-size: .9rem; }
+  .prosa .kotak-data ul { margin: 0; }
+  .daftar-artikel { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--garis); max-width: 68ch; }
+  .daftar-artikel li { padding: 1.1rem 0; border-bottom: 1px solid var(--garis); }
+  .daftar-artikel h2 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  .daftar-artikel h2 a { text-decoration: none; }
+  .daftar-artikel h2 a:hover { text-decoration: underline; text-decoration-color: var(--oranye); text-underline-offset: 3px; }
+  .daftar-artikel p { color: var(--redup); margin: 0; }
+</style>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Cara Klaim Game Gratis di Epic Games Store Setiap Minggu", "description": "Panduan lengkap klaim game gratis mingguan Epic Games Store dari Indonesia: jadwal dalam WIB, langkah klaim lewat PC atau HP, dan cara supaya tidak pernah ketinggalan.", "datePublished": "2026-09-27", "dateModified": "2026-09-27", "author": {"@type": "Person", "name": "Sarathiel"}, "publisher": {"@type": "Organization", "name": "GameDiskon", "url": "https://gamediskon.my.id/"}, "mainEntityOfPage": "https://gamediskon.my.id/panduan/cara-klaim-game-gratis-epic-games/", "inLanguage": "id"}</script>
+</head>
+<body>
+  <div class="wadah">
+    <nav class="jejak" aria-label="Lokasi halaman"><ol><li><a href="https://gamediskon.my.id/">Beranda</a></li><li><a href="/panduan/">Panduan</a></li><li aria-current="page">Cara Klaim Game Gratis di Epic Games Store Setiap Minggu</li></ol></nav>
+    <main class="prosa">
+      <article>
+        <h1>Cara Klaim Game Gratis di Epic Games Store Setiap Minggu</h1>
+        <p class="meta">Ditulis oleh Sarathiel, 27 September 2026.</p>
+<p>Setiap minggu, Epic Games Store membagikan satu atau lebih game PC secara gratis. Bukan versi uji coba dan bukan pinjaman: sekali kamu klaim, game itu masuk ke library akunmu dan jadi milikmu selamanya, walaupun setelah promonya selesai harganya kembali normal.</p>
+<p>Masalahnya, waktu klaimnya terbatas, sekitar satu minggu. Kalau terlewat, game itu kembali berbayar. Panduan ini menjelaskan jadwalnya dalam WIB, cara klaim langkah demi langkah, dan kebiasaan kecil supaya kamu tidak pernah ketinggalan.</p>
+<h2>Game gratis Epic minggu ini</h2>
+<div class="kotak-data"><p>Game gratis Epic yang sedang berlaku (diperbarui otomatis setiap hari)</p><ul><li><a href="https://store.epicgames.com/p/astrea-six-sided-oracles-33c949" rel="noopener">Astrea Six Sided Oracles</a>, klaim sebelum 01/10 22:00 WIB</li><li><a href="https://store.epicgames.com/p/mechabellum-88a843" rel="noopener">Mechabellum</a>, klaim sebelum 01/10 22:00 WIB</li></ul></div>
+<h2>Kapan game gratis Epic berganti?</h2>
+<p>Game gratis Epic berganti <strong>setiap hari Kamis pukul 11.00 waktu New York</strong>. Karena Amerika Serikat memakai jam musim panas, waktunya di Indonesia bergeser dua kali setahun:</p>
+<ul>
+<li><strong>Sekitar pertengahan Maret sampai awal November:</strong> Kamis pukul <strong>22.00 WIB</strong>.</li>
+<li><strong>Sekitar awal November sampai pertengahan Maret:</strong> Kamis pukul <strong>23.00 WIB</strong>.</li>
+</ul>
+<p>Untuk WITA tambahkan satu jam, dan untuk WIT tambahkan dua jam. Jadi, patokan paling mudah: <strong>setiap Kamis malam</strong>, cek Epic Games Store. Saat itu game minggu lalu berhenti gratis dan game baru mulai bisa diklaim.</p>
+<h2>Yang perlu disiapkan</h2>
+<ol>
+<li><strong>Akun Epic Games.</strong> Pendaftarannya gratis di situs Epic Games. Kamu juga bisa masuk memakai akun Google, Steam, PlayStation, Xbox, atau Nintendo.</li>
+<li><strong>Autentikasi dua faktor (2FA).</strong> Epic meminta 2FA aktif untuk klaim game gratis. Aktifkan lewat menu <strong>Account → Password &amp; Security</strong> di situs Epic. Selain jadi syarat, 2FA juga melindungi akunmu yang isinya akan terus bertambah.</li>
+</ol>
+<p>Kamu <strong>tidak perlu</strong> memasukkan kartu kredit atau metode pembayaran apa pun untuk klaim game gratis.</p>
+<h2>Cara klaim lewat browser (PC atau HP)</h2>
+<p>Cara ini paling praktis karena tidak perlu memasang aplikasi apa pun, dan bisa dilakukan dari HP sambil rebahan. Tampilan toko Epic umumnya berbahasa Inggris, jadi nama tombol di bawah ditulis sesuai yang muncul di layar.</p>
+<ol>
+<li>Buka <strong>store.epicgames.com</strong> dan masuk ke akunmu.</li>
+<li>Gulir ke bagian <strong>Free Games</strong> di halaman utama toko.</li>
+<li>Pilih game yang berlabel <strong>Free Now</strong> (bukan "Coming Soon", yang itu baru bisa diklaim minggu depan).</li>
+<li>Klik <strong>Get</strong>. Di jendela pembayaran, pastikan totalnya <strong>Rp 0</strong> atau <strong>Free</strong>, lalu klik <strong>Place Order</strong>.</li>
+<li>Selesai. Game sudah tercatat di library akunmu.</li>
+</ol>
+<p>Kamu <strong>tidak harus langsung mengunduh</strong> game-nya. Yang penting diklaim dulu sebelum batas waktunya. Game bisa diunduh kapan saja nanti lewat aplikasi Epic Games Launcher di PC.</p>
+<h2>Cara klaim lewat Epic Games Launcher</h2>
+<p>Kalau aplikasi Epic Games Launcher sudah terpasang di PC:</p>
+<ol>
+<li>Buka launcher dan pilih menu <strong>Store</strong>.</li>
+<li>Gulir ke bagian <strong>Free Games</strong>, lalu pilih game yang berlabel <strong>Free Now</strong>.</li>
+<li>Klik <strong>Get</strong>, lalu <strong>Place Order</strong> di jendela pembayaran.</li>
+<li>Game muncul di menu <strong>Library</strong> dan bisa langsung diunduh.</li>
+</ol>
+<h2>Supaya tidak pernah ketinggalan</h2>
+<ul>
+<li><strong>Jadikan Kamis malam sebagai jadwal rutin.</strong> Pasang pengingat berulang di HP setiap Kamis pukul 22.00 WIB (atau 23.00 WIB saat bulan November sampai Maret).</li>
+<li><strong>Klaim semua game gratis, walaupun belum tertarik.</strong> Klaim tidak memakan ruang penyimpanan dan tidak ada ruginya. Siapa tahu setahun lagi kamu ingin memainkannya, dan saat itu harganya sudah kembali normal.</li>
+<li><strong>Ikuti kabar harian.</strong> Channel Telegram kami mengirim info game gratis Epic yang baru, lengkap dengan batas waktu klaimnya, dan <a href="/">beranda GameDiskon</a> selalu menampilkan game gratis yang sedang berlaku.</li>
+<li><strong>Waspadai akhir tahun.</strong> Menjelang Natal dan Tahun Baru, Epic biasanya mengadakan event game misteri dengan game gratis yang berganti setiap hari, bukan setiap minggu. Di periode ini, cek setiap hari.</li>
+</ul>
+<h2>Pertanyaan yang sering muncul</h2>
+<h3>Apakah game gratis Epic benar-benar jadi milik saya selamanya?</h3>
+<p>Ya. Setelah diklaim, game tetap ada di library akunmu walaupun promonya sudah selesai. Kamu bisa menghapus lalu mengunduhnya lagi kapan saja tanpa bayar.</p>
+<h3>Saya lupa klaim, apakah masih bisa didapat?</h3>
+<p>Tidak. Setelah batas waktunya lewat, game kembali ke harga normal. Epic jarang menggratiskan game yang sama dua kali, jadi sebaiknya jangan ditunda.</p>
+<h3>Kenapa tombol Get tidak muncul?</h3>
+<p>Pastikan kamu sudah masuk ke akun dan 2FA sudah aktif. Kalau game tertulis sudah ada di library, berarti kamu sudah pernah mengklaim atau membelinya. Sesekali, game gratis tertentu juga tidak tersedia untuk semua negara.</p>
+<h3>Apakah game gratis Epic bisa dimainkan di HP?</h3>
+<p>Umumnya tidak, karena sebagian besar game gratis mingguan adalah game PC. Epic sesekali juga membagikan game gratis untuk Android lewat aplikasi Epic Games Store, tapi ketersediaannya bisa berbeda di tiap negara.</p>
+      </article>
+    </main>
+    <footer>
+      <ul class="tautan-kaki"><li><a href="/game/">Semua game</a></li><li><a href="/panduan/">Panduan</a></li><li><a href="/tentang/">Tentang</a></li><li><a href="/kebijakan-privasi/">Kebijakan Privasi</a></li><li><a href="/kontak/">Kontak</a></li></ul>
+      <p>Harga dicek setiap hari langsung ke Steam region Indonesia. Situs ini tidak berafiliasi dengan Valve maupun Epic Games. Selalu cek halaman toko sebelum membeli.</p>
+    </footer>
+  </div>
+</body>
+</html>
