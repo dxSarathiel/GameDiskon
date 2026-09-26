@@ -138,6 +138,7 @@ h3 { font-size: 1.35rem; }
 .voucher.lebar { max-width: none; display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: center; justify-content: space-between; }
 .voucher.lebar > div { flex: 1 1 28rem; }
 .voucher.lebar .tombol { margin: 0; }
+.voucher.alarm { border-left-color: var(--biru); }
 
 /* ---------- Tanya jawab ---------- */
 .tanya { max-width: 62ch; border-top: 2px solid var(--tinta); }
