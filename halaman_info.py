@@ -47,6 +47,9 @@ def _tentang(situs, link_telegram, nama_channel):
       <h2>Yang perlu diketahui</h2>
       <p>Harga bisa berubah sewaktu-waktu di antara dua pengecekan, jadi selalu lihat harga di halaman toko sebelum membeli. GameDiskon tidak berafiliasi dengan Valve, Epic Games, maupun CheapShark. Semua tombol beli mengarah langsung ke toko resminya.</p>
 
+      <h2 id="afiliasi">Tautan afiliasi</h2>
+      <p>Beberapa tombol di situs dan channel Telegram, misalnya "Beli voucher di Lapakgaming", adalah tautan afiliasi. Kalau kamu membeli lewat tautan itu, GameDiskon mendapat komisi kecil dari Lapakgaming. Harga yang kamu bayar tidak bertambah, dan kode promo yang kami bagikan justru memberi potongan. Komisi ini membantu biaya domain dan hosting, dan tidak memengaruhi diskon mana yang tampil: semua diskon Steam dipilih otomatis dengan syarat yang sama.</p>
+
       <h2>Pengelola</h2>
       <p>GameDiskon dikelola oleh {escape(PENGELOLA)}. Punya pertanyaan, menemukan harga yang salah, atau ingin bekerja sama? Kunjungi <a href="{situs}kontak/">halaman kontak</a>.</p>"""
 
@@ -73,8 +76,11 @@ def _kebijakan(situs):
       </ul>
       <p>Tombol dan tautan ke Steam, Epic Games Store, dan Telegram membawamu ke situs mereka. Di sana, kebijakan privasi mereka yang berlaku.</p>
 
+      <h2>Tautan afiliasi</h2>
+      <p>Tombol seperti "Beli voucher di Lapakgaming" adalah tautan afiliasi. Alamat tautan itu membawa penanda (parameter utm) supaya Lapakgaming tahu kunjunganmu berasal dari GameDiskon dan bisa menghitung komisi. Situs ini sendiri tetap tidak memasang cookie. Apa yang dicatat Lapakgaming setelah kamu tiba di situs mereka diatur oleh kebijakan privasi Lapakgaming.</p>
+
       <h2>Perubahan kebijakan</h2>
-      <p>Kalau kelak situs ini menambahkan iklan, tautan afiliasi, atau alat statistik pengunjung, kebijakan ini akan diperbarui lebih dulu dan tanggal berlakunya diubah.</p>
+      <p>Kalau kelak situs ini menambahkan iklan atau alat statistik pengunjung, kebijakan ini akan diperbarui lebih dulu dan tanggal berlakunya diubah.</p>
 
       <h2>Pertanyaan</h2>
       <p>Untuk pertanyaan tentang privasi, {kontak}.</p>"""
