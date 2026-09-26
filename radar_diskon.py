@@ -31,6 +31,19 @@ except Exception as err:
     def url_situs():
         return ""
 
+try:
+    from halaman_game import buat_halaman_game, buat_slug, jalur_game
+except Exception as err:
+    # Kesalahan di halaman_game.py hanya melewatkan halaman per game
+    print("halaman_game.py bermasalah, halaman per game dilewati:", err)
+    buat_halaman_game = None
+
+    def buat_slug(nama):
+        return ""
+
+    def jalur_game(appid, slug):
+        return ""
+
 # ---------- Pengaturan (ubah sesuai selera) ----------
 MIN_DISKON_PERSEN = 50      # diskon minimal di harga Indonesia
 MIN_RATING_STEAM = 85       # % ulasan positif minimal
@@ -160,6 +173,9 @@ def catat_harga(riwayat, appid, nama, harga):
     g = riwayat.setdefault(appid, {"nama": nama, "mulai": HARI_INI, "riwayat": []})
     g["nama"] = nama or g.get("nama", "")
     g["cek"] = HARI_INI
+    g["normal"] = harga["initial"]                       # harga tanpa diskon saat ini
+    if not g.get("slug") and g["nama"]:
+        g["slug"] = buat_slug(g["nama"])                 # dibuat sekali, supaya alamat halaman tetap
     entri = [HARI_INI, harga["final"], harga["discount_percent"]]
     if not g["riwayat"] or g["riwayat"][-1][1] != harga["final"]:
         g["riwayat"].append(entri)
@@ -258,6 +274,7 @@ def proses_steam(state, riwayat):
             "rating": f"{int(d['steamRatingPercent'])}%",
             "terendah_sejak": label.get(appid),
             "url": f"https://store.steampowered.com/app/{appid}/",
+            "halaman": jalur_game(appid, riwayat[appid].get("slug")) if appid in riwayat else "",
             "gambar": f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg",
         })
 
@@ -450,11 +467,17 @@ def main():
         steam_gagal = True
 
     # Halaman web juga diperbarui setiap hari, termasuk hari tanpa posting baru
+    halaman_lain = []
+    if BUAT_HALAMAN and buat_halaman_game and riwayat:
+        try:
+            halaman_lain = buat_halaman_game(riwayat, link_telegram=link_channel())
+        except Exception as err:
+            print("Halaman game gagal dibuat:", err)
     if BUAT_HALAMAN and buat_halaman and (epic_semua or steam_layak):
         try:
             path = buat_halaman(epic_semua, steam_layak, link_telegram=link_channel(),
                                 nama_channel=NAMA_CHANNEL, google_verifikasi=GOOGLE_VERIFIKASI,
-                                event=event_hari_ini())
+                                event=event_hari_ini(), halaman_lain=halaman_lain)
             print(f"Halaman web diperbarui: {path} ({len(steam_layak)} diskon Steam, {len(epic_semua)} gratis Epic)")
         except Exception as err:
             print("Halaman web gagal dibuat:", err)
