@@ -203,6 +203,7 @@ def _kerangka(judul, deskripsi, kanonik, isi, og_gambar="", noindex=False, jsonl
 # Tautan di kaki setiap halaman (juga dipakai halaman.py untuk beranda)
 TAUTAN_KAKI = ('<ul class="tautan-kaki">'
                '<li><a href="/game/">Semua game</a></li>'
+               '<li><a href="/panduan/">Panduan</a></li>'
                '<li><a href="/tentang/">Tentang</a></li>'
                '<li><a href="/kebijakan-privasi/">Kebijakan Privasi</a></li>'
                '<li><a href="/kontak/">Kontak</a></li>'
