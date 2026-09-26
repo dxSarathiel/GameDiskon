@@ -37,7 +37,7 @@ NAMA_CHANNEL = "Kumpulan Game Diskon"  # tampil di bagian atas gambar
 KIRIM_GAMBAR = True                     # ubah ke False untuk kembali ke teks saja
 BUAT_HALAMAN = True                     # halaman web harian untuk GitHub Pages (folder docs)
 TAMPILKAN_LINK_WEB = False              # ubah ke True SETELAH GitHub Pages aktif
-GOOGLE_VERIFIKASI = ""                  # isi kode dari Google Search Console (opsional)
+GOOGLE_VERIFIKASI = "NeGuLjS_j7yta3znaeJWo-JRiksuR9yDI_F7atB-RqU"                  # isi kode dari Google Search Console (opsional)
 
 USER_AGENT = "RadarDiskonGameID/0.4 (github.com/dxSarathiel/GameDiskon)"  # ganti USERNAME
 STATE_FILE = "sent.json"
