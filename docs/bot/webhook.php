@@ -8,7 +8,7 @@ require __DIR__ . '/inti.php';
 
 // Hanya terima kiriman yang membawa kunci rahasia webhook (diatur lewat pasang.php)
 $kunci = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
-if (!hash_equals((string)konfigurasi()['webhook_rahasia'], (string)$kunci)) { http_response_code(403); exit; }
+if (!kunci_cocok(konfigurasi()['webhook_rahasia'], $kunci)) { http_response_code(403); exit; }
 
 $update = json_decode(file_get_contents('php://input'), true);
 if (!is_array($update)) { exit; }

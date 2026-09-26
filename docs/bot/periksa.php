@@ -7,7 +7,7 @@ define('GAMEDISKON_BOT', true);
 require __DIR__ . '/inti.php';
 
 $kunci = $_SERVER['HTTP_X_KUNCI'] ?? '';
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals((string)konfigurasi()['kunci_periksa'], (string)$kunci)) {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !kunci_cocok(konfigurasi()['kunci_periksa'], $kunci)) {
     http_response_code(403); exit;
 }
 header('Content-Type: application/json');

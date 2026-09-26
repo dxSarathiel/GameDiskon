@@ -2,9 +2,11 @@
 /*
  * Inti bot alarm harga GameDiskon (dipakai webhook.php, periksa.php, pasang.php).
  *
- * Rahasia TIDAK disimpan di sini, karena repo ini publik. Token bot dan kunci-kunci
- * disimpan di luar folder situs, di:  /home/<akun-cpanel>/gamediskon-bot/config.php
- * Data alarm juga disimpan di folder itu (alarm.json), jadi tidak bisa dibuka dari web.
+ * Rahasia TIDAK disimpan di sini, karena repo ini publik. Semuanya ada di luar folder situs,
+ * di folder /home/<akun-cpanel>/gamediskon-bot/ :
+ *   config.php  -> dibuat manual, hanya berisi token bot
+ *   kunci.json  -> dibuat otomatis oleh pasang.php (kunci webhook & kunci periksa)
+ *   alarm.json  -> data alarm pengguna, dibuat otomatis
  */
 
 if (!defined('GAMEDISKON_BOT')) { http_response_code(404); exit; }
@@ -19,14 +21,22 @@ define('MAKS_HASIL_CARI', 6);
 define('LINK_VOUCHER', 'https://www.lapakgaming.com/id-id/voucher-steam-wallet?utm_campaign=Sarathiel&utm_source=Affiliate&utm_medium=LGA');
 define('KODE_BARU', 'LGCSNEW');
 
-function konfigurasi() {
+function konfigurasi($muat_ulang = false) {
     static $k = null;
-    if ($k === null) {
+    if ($k === null || $muat_ulang) {
         $path = FOLDER_RAHASIA . '/config.php';
         if (!is_file($path)) { http_response_code(500); exit("config.php belum dibuat di " . FOLDER_RAHASIA); }
         $k = require $path;
+        $file_kunci = FOLDER_RAHASIA . '/kunci.json';
+        if (is_file($file_kunci)) { $k += (json_decode(file_get_contents($file_kunci), true) ?: []); }
+        $k += ['webhook_rahasia' => '', 'kunci_periksa' => ''];
     }
     return $k;
+}
+
+// Cocokkan kunci kiriman dengan kunci tersimpan. Kunci kosong selalu ditolak.
+function kunci_cocok($tersimpan, $kiriman) {
+    return (string)$tersimpan !== '' && hash_equals((string)$tersimpan, (string)$kiriman);
 }
 
 // ---------- Telegram ----------
