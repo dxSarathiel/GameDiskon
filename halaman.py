@@ -1,5 +1,6 @@
 """
-Membuat halaman web statis (docs/index.html, sitemap.xml, robots.txt, .htaccess)
+Membuat halaman web statis (docs/index.html, sitemap.xml, robots.txt, .htaccess).
+Halaman per game dibuat terpisah oleh halaman_game.py
 yang di-upload ke hosting gamediskon.my.id.
 Halaman menampilkan SEMUA diskon yang layak hari ini (bukan hanya yang baru
 diposting), jadi selalu lengkap walaupun channel hari itu hanya memposting sedikit.
@@ -74,6 +75,9 @@ def _baris_steam(g, pertama):
         mulai = datetime.strptime(g["terendah_sejak"], "%Y-%m-%d")
         terendah = (f'<p class="terendah">Terendah sejak dicatat '
                     f'({mulai.day} {BULAN[mulai.month - 1][:3]} {mulai.year})</p>')
+    riwayat = ""
+    if g.get("halaman"):
+        riwayat = f'<p class="ke-riwayat"><a href="/{escape(g["halaman"])}">Riwayat harga</a></p>'
     return f"""
       <li class="baris">
         <a class="sampul" href="{escape(g['url'])}" rel="noopener" tabindex="-1" aria-hidden="true">
@@ -82,7 +86,7 @@ def _baris_steam(g, pertama):
         <div class="info">
           <h3><a href="{escape(g['url'])}" rel="noopener">{escape(g['judul'])}</a></h3>
           <p class="ulasan">{escape(g['rating'])} ulasan positif di Steam</p>
-          {terendah}
+          {terendah}{riwayat}
         </div>
         <div class="harga">
           <span class="label">-{g['diskon']}%</span>
@@ -107,7 +111,8 @@ def _kartu_epic(g, pertama):
 
 
 def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
-                 google_verifikasi="", event=None):
+                 google_verifikasi="", event=None, halaman_lain=None):
+    """halaman_lain: daftar (url, lastmod) tambahan untuk sitemap, misalnya halaman game."""
     os.makedirs(folder, exist_ok=True)
     sekarang = datetime.now(WIB)
     situs = url_situs()
@@ -149,6 +154,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
       <p class="catatan">Diskon minimal 50% untuk game dengan ulasan minimal 85% positif. Harga dicek langsung ke Steam region Indonesia.</p>
       <ol class="papan">{baris}
       </ol>
+      <p class="catatan"><a href="/game/">Lihat semua game yang dipantau harganya</a></p>
     </section>"""
     else:
         bagian_steam = """
@@ -244,6 +250,9 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
   .info h3 a:hover {{ text-decoration: underline; text-decoration-color: var(--oranye); text-underline-offset: 3px; }}
   .ulasan {{ color: var(--redup); font-size: .9rem; margin: .2rem 0 0; }}
   .terendah {{ color: var(--hijau); font-size: .9rem; font-weight: 500; margin: .2rem 0 0; }}
+  .ke-riwayat {{ font-size: .9rem; margin: .2rem 0 0; }}
+  .ke-riwayat a {{ color: var(--redup); text-underline-offset: 3px; }}
+  .ke-riwayat a:hover {{ color: var(--teks); text-decoration-color: var(--oranye); }}
   .harga {{ display: flex; align-items: center; gap: .9rem; }}
   .label {{
     /* bentuk label harga: ujung kiri runcing, sama dengan logo channel */
@@ -316,7 +325,9 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
                 f"  <url><loc>{situs}</loc><lastmod>{sekarang:%Y-%m-%d}</lastmod></url>\n"
-                "</urlset>\n"
+                + "".join(f"  <url><loc>{escape(u)}</loc><lastmod>{t}</lastmod></url>\n"
+                          for u, t in (halaman_lain or []))
+                + "</urlset>\n"
             )
         # robots.txt: izinkan semua mesin pencari dan tunjukkan lokasi sitemap
         with open(os.path.join(folder, "robots.txt"), "w", encoding="utf-8") as f:
