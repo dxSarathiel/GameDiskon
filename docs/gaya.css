@@ -128,6 +128,17 @@ h3 { font-size: 1.35rem; }
 .beli { display: inline-block; font-size: .9rem; font-weight: 700; margin: .45rem 0 .6rem; }
 .kosong { background: var(--rak); padding: 1.25rem; max-width: 62ch; }
 
+/* ---------- Kotak voucher (tautan afiliasi) ---------- */
+.voucher { background: var(--rak); border-left: 8px solid var(--kuning); padding: 1.25rem 1.4rem; margin: 0 0 3rem; max-width: 46rem; }
+.voucher h2 { font-size: 1.7rem; margin: 0 0 .4rem; }
+.voucher p { margin: 0 0 .7rem; }
+.voucher .kode b { background: var(--kuning); padding: .05rem .4rem; font-weight: 800; letter-spacing: .02em; }
+.voucher .tombol { margin: .4rem 0 .8rem; }
+.voucher .ungkap { font-size: .85rem; color: var(--redup); margin: 0; }
+.voucher.lebar { max-width: none; display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: center; justify-content: space-between; }
+.voucher.lebar > div { flex: 1 1 28rem; }
+.voucher.lebar .tombol { margin: 0; }
+
 /* ---------- Tanya jawab ---------- */
 .tanya { max-width: 62ch; border-top: 2px solid var(--tinta); }
 .tanya details { border-bottom: 1px solid var(--garis); padding: .9rem 0; }
