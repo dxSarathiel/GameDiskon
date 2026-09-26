@@ -54,6 +54,7 @@ jobs:
         run: sleep 90
 
       - name: Upload ulang (percobaan kedua)
+        id: upload2
         if: steps.upload1.outcome == 'failure'
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
@@ -68,3 +69,12 @@ jobs:
             **/.git*
             **/.git*/**
             .nojekyll
+
+      - name: Kirim alarm harga
+        # Hanya kalau upload berhasil, supaya bot di hosting membaca harga hari ini
+        if: steps.upload1.outcome == 'success' || steps.upload2.outcome == 'success'
+        env:
+          KUNCI: ${{ secrets.ALARM_KUNCI }}
+        run: |
+          if [ -z "$KUNCI" ]; then echo "Secret ALARM_KUNCI belum diisi, alarm harga dilewati."; exit 0; fi
+          curl -fsS --max-time 120 -X POST -H "X-Kunci: $KUNCI" https://gamediskon.my.id/bot/periksa.php
