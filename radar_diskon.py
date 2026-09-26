@@ -39,7 +39,7 @@ BUAT_HALAMAN = True                     # halaman web harian untuk GitHub Pages 
 TAMPILKAN_LINK_WEB = False              # ubah ke True SETELAH GitHub Pages aktif
 GOOGLE_VERIFIKASI = ""                  # isi kode dari Google Search Console (opsional)
 
-USER_AGENT = "RadarDiskonGameID/0.4 (github.com/USERNAME/radar-diskon)"  # ganti USERNAME
+USER_AGENT = "RadarDiskonGameID/0.4 (github.com/dxSarathiel/GameDiskon)"  # ganti USERNAME
 STATE_FILE = "sent.json"
 RIWAYAT_FILE = "harga_idr.json"
 GAMBAR_FILE = "radar.jpg"
