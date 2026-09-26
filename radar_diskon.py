@@ -1,11 +1,12 @@
 """
-Radar Diskon Game — v3 (riwayat harga Rupiah + gambar ringkasan)
+Radar Diskon Game — v4 (riwayat harga Rupiah + gambar ringkasan + halaman web)
 Sumber data (semua gratis, tanpa API key):
   1. CheapShark  -> daftar kandidat diskon Steam yang ratingnya bagus
   2. Steam       -> cek harga ASLI di region Indonesia (Rupiah)
   3. Epic Games  -> game yang sedang gratis
 Setiap hari, harga Rupiah semua game yang dipantau dicatat ke harga_idr.json.
 Setiap posting disertai gambar ringkasan (dibuat oleh gambar.py).
+Setiap hari halaman web docs/index.html diperbarui untuk GitHub Pages (halaman.py).
 Hasil dikirim ke channel Telegram. Kalau token belum diisi, hanya dicetak (dry run).
 """
 
@@ -19,6 +20,7 @@ from html import escape, unescape
 import requests
 
 from gambar import buat_gambar
+from halaman import buat_halaman, url_situs
 
 # ---------- Pengaturan (ubah sesuai selera) ----------
 MIN_DISKON_PERSEN = 50      # diskon minimal di harga Indonesia
@@ -31,10 +33,13 @@ HALAMAN_CHEAPSHARK = 2      # 2 halaman x 60 = sampai 120 kandidat per hari
 MAKS_GAME_DIPANTAU = 2000   # batas jumlah game yang harganya dicatat tiap hari
 MIN_HARI_DATA = 30          # label "terendah" baru muncul setelah data game >= sekian hari
 
-NAMA_CHANNEL = "List Game Diskon by Sarathiel"  # tampil di bagian atas gambar
+NAMA_CHANNEL = "Kumpulan Game Diskon"  # tampil di bagian atas gambar
 KIRIM_GAMBAR = True                     # ubah ke False untuk kembali ke teks saja
+BUAT_HALAMAN = True                     # halaman web harian untuk GitHub Pages (folder docs)
+TAMPILKAN_LINK_WEB = False              # ubah ke True SETELAH GitHub Pages aktif
+GOOGLE_VERIFIKASI = ""                  # isi kode dari Google Search Console (opsional)
 
-USER_AGENT = "RadarDiskonGameID/0.3 (github.com/dxSarathiel/GameDiskon)"  # ganti USERNAME
+USER_AGENT = "RadarDiskonGameID/0.4 (github.com/USERNAME/radar-diskon)"  # ganti USERNAME
 STATE_FILE = "sent.json"
 RIWAYAT_FILE = "harga_idr.json"
 GAMBAR_FILE = "radar.jpg"
@@ -168,8 +173,8 @@ def proses_steam(state, riwayat):
         if appid in kandidat:
             riwayat[appid]["kandidat"] = HARI_INI  # terakhir kali muncul sebagai kandidat
 
-    # Pilih yang layak diposting
-    hasil = []
+    # Semua yang lolos saringan (untuk halaman web), lalu yang belum pernah diposting (untuk Telegram)
+    layak = []
     for appid, d in kandidat.items():
         harga = harga_idr.get(appid)
         if not harga or harga["discount_percent"] < MIN_DISKON_PERSEN:
@@ -179,9 +184,7 @@ def proses_steam(state, riwayat):
         if int(d.get("steamRatingCount") or 0) < MIN_JUMLAH_ULASAN:
             continue
         kunci = f"steam:{appid}:{harga['final']}"
-        if kunci in state:
-            continue
-        hasil.append({
+        layak.append({
             "kunci": kunci,
             "judul": " ".join(d["title"].split()),
             "diskon": harga["discount_percent"],
@@ -194,12 +197,13 @@ def proses_steam(state, riwayat):
         })
 
     # Yang harganya terendah tercatat didahulukan, lalu yang diskonnya terbesar
-    hasil.sort(key=lambda x: (x["terendah_sejak"] is not None, x["diskon"]), reverse=True)
-    return hasil[:MAKS_ITEM_STEAM], len(harga_idr)
+    layak.sort(key=lambda x: (x["terendah_sejak"] is not None, x["diskon"]), reverse=True)
+    baru = [g for g in layak if g["kunci"] not in state]
+    return baru[:MAKS_ITEM_STEAM], layak, len(harga_idr)
 
 
 # ---------- Sumber 3: Epic gratis ----------
-def ambil_gratis_epic(state):
+def ambil_gratis_epic():
     r = session.get(
         "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions",
         params={"locale": "en-US", "country": "ID", "allowCountries": "ID"},
@@ -213,8 +217,6 @@ def ambil_gratis_epic(state):
             continue
         tawaran = promo[0]["promotionalOffers"][0]
         kunci = f"epic:{e['id']}:{tawaran['startDate']}"
-        if kunci in state:
-            continue
         slug = next((m["pageSlug"] for m in (e.get("offerMappings") or []) if m.get("pageSlug")),
                     e.get("productSlug"))
         berakhir = datetime.fromisoformat(tawaran["endDate"].replace("Z", "+00:00")).astimezone(WIB)
@@ -251,6 +253,9 @@ def susun_pesan(epic, steam):
             if g["terendah_sejak"]:
                 teks += f'\n   📉 <i>Terendah sejak dicatat ({tanggal_pendek(g["terendah_sejak"])})</i>'
             baris.append(teks)
+    situs = url_situs()
+    if TAMPILKAN_LINK_WEB and situs:
+        baris += ["", f'🌐 <a href="{situs}">Lihat semua diskon hari ini di web</a>']
     return "\n".join(baris).strip()
 
 
@@ -304,18 +309,29 @@ def main():
 
     # Satu sumber gagal tidak boleh menggagalkan semuanya
     try:
-        epic = ambil_gratis_epic(state)
+        epic_semua = ambil_gratis_epic()
     except Exception as err:
         print("Epic gagal:", err)
-        epic = []
+        epic_semua = []
+    epic = [g for g in epic_semua if g["kunci"] not in state]
+
+    steam, steam_layak = [], []
     try:
-        steam, jumlah_dicek = proses_steam(state, riwayat)
+        steam, steam_layak, jumlah_dicek = proses_steam(state, riwayat)
         # Riwayat disimpan SETIAP hari, walaupun tidak ada yang diposting
         tulis_json(RIWAYAT_FILE, riwayat, rapi=False)
         print(f"Harga dicatat: {jumlah_dicek} game dicek, total {len(riwayat)} game dipantau.")
     except Exception as err:
         print("Steam/CheapShark gagal:", err)
-        steam = []
+
+    # Halaman web juga diperbarui setiap hari, termasuk hari tanpa posting baru
+    if BUAT_HALAMAN and (epic_semua or steam_layak):
+        try:
+            path = buat_halaman(epic_semua, steam_layak, link_telegram=link_channel(),
+                                nama_channel=NAMA_CHANNEL, google_verifikasi=GOOGLE_VERIFIKASI)
+            print(f"Halaman web diperbarui: {path} ({len(steam_layak)} diskon Steam, {len(epic_semua)} gratis Epic)")
+        except Exception as err:
+            print("Halaman web gagal dibuat:", err)
 
     if not epic and not steam:
         print("Tidak ada deal baru hari ini.")
