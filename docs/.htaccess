@@ -1,0 +1,21 @@
+# Dibuat otomatis oleh halaman.py setiap hari. Perubahan manual akan tertimpa.
+
+# Jangan tampilkan daftar isi folder kepada pengunjung
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Pemeriksaan sertifikat HTTPS (AutoSSL) jangan dialihkan
+RewriteRule ^\.well-known/ - [L]
+
+# www.gamediskon.my.id -> gamediskon.my.id
+RewriteCond %{HTTP_HOST} !^gamediskon\.my\.id$ [NC]
+RewriteCond %{HTTP_HOST} ^www\. [NC]
+RewriteRule ^ https://gamediskon.my.id%{REQUEST_URI} [L,R=301]
+
+# http:// -> https://
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+RewriteRule ^ https://gamediskon.my.id%{REQUEST_URI} [L,R=301]
+</IfModule>
