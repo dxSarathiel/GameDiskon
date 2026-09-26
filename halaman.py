@@ -248,7 +248,10 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
     </section>
     </main>
     <footer>
-      <p>Data harga dari Steam (region Indonesia) dan CheapShark, game gratis dari Epic Games Store. Halaman ini tidak berafiliasi dengan Valve maupun Epic Games. Semua link mengarah ke toko resmi.</p>
+      <p>Selamat menikmati berbagai game gratis dan membeli game diskon
+      <br><br>
+      Powered by Sarathiel
+      </p>
     </footer>
   </div>
 </body>
