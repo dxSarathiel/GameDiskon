@@ -321,6 +321,7 @@ def ambil_gratis_epic():
             "kunci": kunci,
             "judul": e["title"],
             "berakhir": berakhir.strftime("%d/%m %H:%M WIB"),
+            "berakhir_iso": berakhir.isoformat(),
             "url": f"https://store.epicgames.com/p/{slug}" if slug else "https://store.epicgames.com/free-games",
             "gambar": gambar.get("OfferImageWide") or gambar.get("Thumbnail") or next(iter(gambar.values()), ""),
         })
@@ -480,6 +481,11 @@ def main():
 
     # Halaman web juga diperbarui setiap hari, termasuk hari tanpa posting baru
     halaman_lain = []
+    try:
+        import gaya
+        gaya.LINK_TELEGRAM = link_channel()      # tombol Telegram di pita semua halaman
+    except Exception as err:
+        print("gaya.py bermasalah:", err)
     if BUAT_HALAMAN and buat_halaman_game and riwayat:
         try:
             halaman_lain = buat_halaman_game(riwayat, link_telegram=link_channel())
