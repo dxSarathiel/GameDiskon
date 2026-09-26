@@ -10,9 +10,12 @@ import os
 from datetime import datetime, timedelta, timezone
 from html import escape
 
+from gaya import halaman_utuh, kepala, pita, tulis_css
+
 WIB = timezone(timedelta(hours=7))
 BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
          "Agustus", "September", "Oktober", "November", "Desember"]
+HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 MAKS_ITEM_HALAMAN = 60
 
 
@@ -68,52 +71,110 @@ def _tanggal_panjang(dt):
     return f"{dt.day} {BULAN[dt.month - 1]} {dt.year}"
 
 
-def _baris_steam(g, pertama):
-    gambar_attr = 'fetchpriority="high"' if pertama else 'loading="lazy"'
+def _tgl_pendek(iso):
+    d = datetime.strptime(iso, "%Y-%m-%d")
+    return f"{d.day} {BULAN[d.month - 1][:3]} {d.year}"
+
+
+def _barang_steam(g, urutan):
+    """Satu barang di rak: sampul, nama, ulasan, dan label harga kuning di tepi rak."""
+    gambar_attr = 'fetchpriority="high"' if urutan == 0 else 'loading="lazy"'
+    tujuan = f'/{g["halaman"]}' if g.get("halaman") else g["url"]
+    rel = '' if g.get("halaman") else ' rel="noopener"'
     terendah = ""
     if g.get("terendah_sejak"):
-        mulai = datetime.strptime(g["terendah_sejak"], "%Y-%m-%d")
-        terendah = (f'<p class="terendah">Terendah sejak dicatat '
-                    f'({mulai.day} {BULAN[mulai.month - 1][:3]} {mulai.year})</p>')
-    riwayat = ""
-    if g.get("halaman"):
-        riwayat = f'<p class="ke-riwayat"><a href="/{escape(g["halaman"])}">Riwayat harga</a></p>'
+        terendah = f'<p class="terendah">Termurah sejak {_tgl_pendek(g["terendah_sejak"])}</p>'
+    rating = int(str(g["rating"]).rstrip("%") or 0)
     return f"""
-      <li class="baris">
-        <a class="sampul" href="{escape(g['url'])}" rel="noopener" tabindex="-1" aria-hidden="true">
+      <li class="barang" data-urut="{urutan}" data-harga="{g['harga_akhir']}" data-diskon="{g['diskon']}"
+          data-ulasan="{rating}" data-terendah="{1 if g.get('terendah_sejak') else 0}">
+        <a href="{escape(tujuan)}"{rel}>
           <img src="{escape(g['gambar'])}" alt="" width="460" height="215" {gambar_attr} decoding="async">
+          <h3>{escape(g['judul'])}</h3>
+          <p class="ulasan">{rating}% ulasan positif</p>
+          {terendah}
         </a>
-        <div class="info">
-          <h3><a href="{escape(g['url'])}" rel="noopener">{escape(g['judul'])}</a></h3>
-          <p class="ulasan">{escape(g['rating'])} ulasan positif di Steam</p>
-          {terendah}{riwayat}
-        </div>
-        <div class="harga">
-          <span class="label">-{g['diskon']}%</span>
-          <span class="angka">
-            <strong>{_rupiah(g['harga_akhir'])}</strong>
-            <s>{_rupiah(g['harga_awal'])}</s>
-          </span>
+        <a class="beli" href="{escape(g['url'])}" rel="noopener">Beli di Steam</a>
+        <div class="label-rak">
+          <div>
+            <span class="potong">-{g['diskon']}%</span>
+            <span class="harga"><strong>{_rupiah(g['harga_akhir'])}</strong><s>{_rupiah(g['harga_awal'])}</s></span>
+          </div>
         </div>
       </li>"""
 
 
 def _kartu_epic(g, pertama):
     gambar_attr = 'fetchpriority="high"' if pertama else ''
+    iso = g.get("berakhir_iso", "")
     return f"""
-      <li class="gratis">
+      <li>
         <a href="{escape(g['url'])}" rel="noopener">
+          <span class="stempel" aria-hidden="true">GRATIS</span>
           <img src="{escape(g['gambar'])}" alt="" width="640" height="360" {gambar_attr} decoding="async">
-          <span class="judul-gratis">{escape(g['judul'])}</span>
-          <span class="batas">Klaim sebelum {escape(g['berakhir'])}</span>
+          <h3>{escape(g['judul'])}</h3>
+          <p class="batas">Klaim sebelum {escape(g['berakhir'])}<span class="sisa" data-berakhir="{escape(iso)}"></span></p>
         </a>
       </li>"""
+
+
+# Skrip kecil: hitung mundur game gratis, dan tombol saring/urut di rak diskon.
+# Tanpa JavaScript halaman tetap lengkap; tombolnya saja yang tidak muncul.
+SKRIP_BERANDA = """<script>
+(function () {
+  // Hitung mundur batas klaim game gratis
+  document.querySelectorAll('.sisa[data-berakhir]').forEach(function (el) {
+    var akhir = Date.parse(el.dataset.berakhir);
+    if (!akhir) return;
+    var ms = akhir - Date.now();
+    if (ms <= 0) { el.textContent = '. Sudah berakhir.'; return; }
+    var jam = Math.floor(ms / 36e5), hari = Math.floor(jam / 24);
+    el.textContent = hari > 0 ? '. Sisa ' + hari + ' hari ' + (jam % 24) + ' jam.' : '. Sisa ' + jam + ' jam lagi!';
+  });
+
+  // Saring dan urutkan rak diskon
+  var rak = document.querySelector('.rak'), kontrol = document.querySelector('.kontrol');
+  if (!rak || !kontrol) return;
+  kontrol.hidden = false;
+  var barang = Array.prototype.slice.call(rak.children), info = document.querySelector('.hasil-saring');
+  var saringan = {
+    semua: function () { return true; },
+    sembilan: function (b) { return +b.dataset.diskon >= 90; },
+    murah: function (b) { return +b.dataset.harga < 2000000; },
+    ulasan: function (b) { return +b.dataset.ulasan >= 95; },
+    terendah: function (b) { return b.dataset.terendah === '1'; }
+  };
+  var urutan = {
+    pilihan: function (a, b) { return a.dataset.urut - b.dataset.urut; },
+    termurah: function (a, b) { return a.dataset.harga - b.dataset.harga; },
+    diskon: function (a, b) { return b.dataset.diskon - a.dataset.diskon || a.dataset.harga - b.dataset.harga; },
+    ulasan: function (a, b) { return b.dataset.ulasan - a.dataset.ulasan; }
+  };
+  var aktif = 'semua', pilih = kontrol.querySelector('select');
+  function terapkan() {
+    var n = 0;
+    barang.sort(urutan[pilih.value]).forEach(function (b) {
+      var tampil = saringan[aktif](b); b.hidden = !tampil; if (tampil) n++; rak.appendChild(b);
+    });
+    info.textContent = aktif === 'semua' ? '' : n + ' game cocok dengan saringan ini.';
+  }
+  kontrol.querySelectorAll('button').forEach(function (t) {
+    t.addEventListener('click', function () {
+      aktif = t.dataset.saring;
+      kontrol.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === t); });
+      terapkan();
+    });
+  });
+  pilih.addEventListener('change', terapkan);
+})();
+</script>"""
 
 
 def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
                  google_verifikasi="", event=None, halaman_lain=None):
     """halaman_lain: daftar (url, lastmod) tambahan untuk sitemap, misalnya halaman game."""
     os.makedirs(folder, exist_ok=True)
+    tulis_css(folder)
     sekarang = datetime.now(WIB)
     situs = url_situs()
     steam = steam[:MAKS_ITEM_HALAMAN]
@@ -130,199 +191,119 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
         deskripsi = f"Gratis di Epic: {', '.join(g['judul'] for g in epic)}. " + deskripsi
     og_gambar = (epic[0]["gambar"] if epic else steam[0]["gambar"] if steam else "")
 
-    tombol = ""
-    if link_telegram:
-        tombol = (f'<a class="tombol" href="https://{escape(link_telegram)}" rel="noopener">'
-                  f'Ikuti di Telegram</a>')
+    # --- Event sale (Autumn Sale, Winter Sale, dst.) ---
+    teks_event = ""
+    if event:
+        if event["status"] == "berlangsung":
+            judul_halaman = f"{event['nama']}: Diskon Harian dalam Rupiah ({_tanggal_panjang(sekarang)})"
+            teks_event = f"{event['nama']} sedang berlangsung, {event['periode']}."
+        else:
+            teks_event = f"{event['nama']} dimulai {event['mulai_teks']}."
+        deskripsi = f"{teks_event} {deskripsi}"
 
+    # --- Judul besar di pita biru ---
+    ringkas = []
+    if steam:
+        ringkas.append(f"{len(steam)} diskon lolos saringan")
+    if epic:
+        ringkas.append(f"{len(epic)} game gratis di Epic")
+    kalimat = (f"Dicek {HARI[sekarang.weekday()]}, {_tanggal_panjang(sekarang)} pukul {sekarang:%H.%M} WIB"
+               + (f": {' dan '.join(ringkas)}." if ringkas else "."))
+    event_html = f'\n        <p class="event">{escape(teks_event)}</p>' if teks_event else ""
+    unggulan = ""
+    if steam:
+        # Potongan paling besar hari ini (kalau sama, yang paling murah) ditempel sebagai stiker
+        g = max(steam, key=lambda x: (x["diskon"], -x["harga_akhir"]))
+        tujuan = f'/{g["halaman"]}' if g.get("halaman") else g["url"]
+        unggulan = f"""
+      <a class="unggulan" href="{escape(tujuan)}">
+        <span class="unggulan-ket">Potongan terbesar hari ini</span>
+        <span class="stiker"><span class="potong">-{g['diskon']}%</span><span class="harga"><strong>{_rupiah(g['harga_akhir'])}</strong><s>{_rupiah(g['harga_awal'])}</s></span></span>
+        <span class="unggulan-nama">{escape(g['judul'])}</span>
+      </a>"""
+    hero = f"""
+    <div class="hero">
+      <div>
+        <h1>Diskon Steam hari ini, dalam Rupiah</h1>
+        <p>{escape(kalimat)} Harga diambil langsung dari Steam region Indonesia, bukan hasil konversi dolar.</p>{event_html}
+      </div>{unggulan}
+    </div>"""
+
+    # --- Game gratis Epic ---
     bagian_epic = ""
     if epic:
         kartu = "".join(_kartu_epic(g, i == 0) for i, g in enumerate(epic))
         bagian_epic = f"""
-    <section aria-labelledby="h-gratis">
+    <section class="bagian" aria-labelledby="h-gratis">
       <h2 id="h-gratis">Gratis di Epic Games Store</h2>
-      <p class="catatan">Klaim sebelum batas waktunya dan game jadi milikmu selamanya.</p>
-      <ul class="daftar-gratis">{kartu}
+      <p class="catatan">Klaim sebelum batas waktunya, dan game jadi milikmu selamanya. <a href="/panduan/cara-klaim-game-gratis-epic-games/">Cara klaimnya</a>.</p>
+      <ul class="gratis">{kartu}
       </ul>
     </section>"""
 
+    # --- Rak diskon Steam ---
     if steam:
-        baris = "".join(_baris_steam(g, i == 0 and not epic) for i, g in enumerate(steam))
+        barang = "".join(_barang_steam(g, i) for i, g in enumerate(steam))
+        # Tombol ini hanya muncul kalau memang ada game yang sedang di harga termurahnya
+        tombol_terendah = ('          <button type="button" data-saring="terendah" aria-pressed="false">'
+                           'Termurah sejak dipantau</button>\n'
+                           if any(g.get("terendah_sejak") for g in steam) else "")
         bagian_steam = f"""
-    <section aria-labelledby="h-steam">
-      <h2 id="h-steam">Diskon Steam, harga Indonesia</h2>
-      <p class="catatan">Diskon minimal 50% untuk game dengan ulasan minimal 85% positif. Harga dicek langsung ke Steam region Indonesia.</p>
-      <ol class="papan">{baris}
+    <section class="bagian" aria-labelledby="h-steam">
+      <h2 id="h-steam">Rak diskon Steam</h2>
+      <p class="catatan">Potongan minimal 50% untuk game dengan ulasan minimal 85% positif. Klik game untuk melihat riwayat harganya.</p>
+      <div class="kontrol" hidden>
+        <div class="saring" role="group" aria-label="Saring diskon">
+          <button type="button" data-saring="semua" aria-pressed="true">Semua</button>
+          <button type="button" data-saring="sembilan" aria-pressed="false">Diskon 90% ke atas</button>
+          <button type="button" data-saring="murah" aria-pressed="false">Di bawah Rp 20.000</button>
+          <button type="button" data-saring="ulasan" aria-pressed="false">Ulasan 95% ke atas</button>
+{tombol_terendah}        </div>
+        <label>Urutkan
+          <select>
+            <option value="pilihan">Pilihan kami</option>
+            <option value="termurah">Harga termurah</option>
+            <option value="diskon">Diskon terbesar</option>
+            <option value="ulasan">Ulasan terbaik</option>
+          </select>
+        </label>
+      </div>
+      <p class="hasil-saring" aria-live="polite"></p>
+      <ol class="rak">{barang}
       </ol>
-      <p class="catatan"><a href="/game/">Lihat semua game yang dipantau harganya</a></p>
+      <p class="catatan" style="margin-top:2rem"><a href="/game/">Lihat semua game yang dipantau harganya</a></p>
     </section>"""
     else:
         bagian_steam = """
-    <section aria-labelledby="h-steam">
-      <h2 id="h-steam">Diskon Steam, harga Indonesia</h2>
-      <p class="catatan">Belum ada diskon yang lolos saringan hari ini. Cek lagi besok sore.</p>
+    <section class="bagian" aria-labelledby="h-steam">
+      <h2 id="h-steam">Rak diskon Steam</h2>
+      <p class="kosong">Belum ada diskon yang lolos saringan hari ini. Rak diisi ulang setiap sore, jadi cek lagi besok.</p>
     </section>"""
 
-        # --- Penanda event sale (Autumn Sale, Winter Sale, dst.) ---
-    bagian_event = ""
-    if event:
-        if event["status"] == "berlangsung":
-            judul_halaman = f"{event['nama']}: Diskon Harian dalam Rupiah ({_tanggal_panjang(sekarang)})"
-            teks_event = (f"{event['nama']} sedang berlangsung, {event['periode']}. "
-                          f"Daftar di bawah diperbarui setiap hari dengan harga Steam Indonesia.")
-        else:
-            teks_event = (f"{event['nama']} dimulai {event['mulai_teks']}. "
-                          f"Pantau halaman ini untuk diskon harian dengan harga Rupiah asli.")
-        deskripsi = f"{teks_event} {deskripsi}"
-        bagian_event = f'\n    <p class="event">{escape(teks_event)}</p>'
-
-    meta_google = (f'<meta name="google-site-verification" content="{escape(google_verifikasi)}">'
-                   if google_verifikasi else "")
-    kanonik = f'<link rel="canonical" href="{situs}">' if situs else ""
-    og_url = f'<meta property="og:url" content="{situs}">' if situs else ""
-
-    html = f"""<!doctype html>
-<html lang="id">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{escape(judul_halaman)}</title>
-<meta name="description" content="{escape(deskripsi)}">
-{kanonik}
-{meta_google}
-<meta property="og:type" content="website">
-<meta property="og:title" content="{escape(judul_halaman)}">
-<meta property="og:description" content="{escape(deskripsi)}">
-<meta property="og:image" content="{escape(og_gambar)}">
-{og_url}
-<meta name="theme-color" content="#14161f">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-  :root {{
-    --latar: #14161f; --panel: #1d202b; --garis: #2a2e3b;
-    --teks: #f5f5f7; --redup: #9aa0b0;
-    --oranye: #ff6b35; --hijau: #2ecc71;
-  }}
-  * {{ box-sizing: border-box; }}
-  body {{
-    margin: 0; background: var(--latar); color: var(--teks);
-    font: 400 1rem/1.6 "Poppins", system-ui, sans-serif;
-  }}
-  a {{ color: inherit; }}
-  a:focus-visible {{ outline: 3px solid var(--oranye); outline-offset: 3px; border-radius: 4px; }}
-  .wadah {{ max-width: 60rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }}
-
-  header {{ display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 1.5rem; margin-bottom: 3rem; }}
-  .nama {{ color: var(--oranye); font-weight: 500; margin: 0 0 .25rem; }}
-  h1 {{ font-size: clamp(1.9rem, 5vw, 3rem); line-height: 1.1; margin: 0; font-weight: 700; max-width: 18ch; }}
-  .diperbarui {{ color: var(--redup); margin: .75rem 0 0; font-size: .95rem; }}
-  .tombol {{
-    display: inline-block; background: var(--oranye); color: #fff; text-decoration: none;
-    font-weight: 700; padding: .8rem 1.4rem; border-radius: .6rem; white-space: nowrap;
-  }}
-  .tombol:hover {{ background: #ff7d4d; }}
-
-  section {{ margin-bottom: 3.5rem; }}
-  h2 {{ font-size: 1.5rem; line-height: 1.25; margin: 0; }}
-  .catatan {{ color: var(--redup); margin: .25rem 0 1.25rem; max-width: 65ch; }}
-  .event {{ background: var(--panel); border-left: 4px solid var(--oranye); border-radius: 0 .6rem .6rem 0;
-           padding: .9rem 1.1rem; margin: -1.5rem 0 3rem; font-weight: 500; max-width: 65ch; }}
-           
-  /* Game gratis: sampul besar, karena ini yang paling dicari */
-  .daftar-gratis {{ list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem;
-                   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }}
-  .gratis a {{ display: block; text-decoration: none; background: var(--panel); border-radius: 1rem;
-              overflow: hidden; border: 2px solid transparent; }}
-  .gratis a:hover {{ border-color: var(--hijau); }}
-  .gratis img {{ display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }}
-  .judul-gratis {{ display: block; font-weight: 700; font-size: 1.15rem; padding: .9rem 1rem 0; }}
-  .batas {{ display: block; color: var(--hijau); font-weight: 500; padding: 0 1rem 1rem; }}
-
-  /* Papan harga: baris-baris seperti label harga di rak toko */
-  .papan {{ list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--garis); }}
-  .baris {{ display: grid; grid-template-columns: 9.5rem 1fr auto; gap: 1.25rem; align-items: center;
-           padding: 1rem 0; border-bottom: 1px solid var(--garis); }}
-  .sampul img {{ display: block; width: 100%; height: auto; aspect-ratio: 460 / 215; border-radius: .5rem; background: var(--panel); }}
-  .info h3 {{ font-size: 1.05rem; line-height: 1.35; margin: 0; }}
-  .info h3 a {{ text-decoration: none; }}
-  .info h3 a:hover {{ text-decoration: underline; text-decoration-color: var(--oranye); text-underline-offset: 3px; }}
-  .ulasan {{ color: var(--redup); font-size: .9rem; margin: .2rem 0 0; }}
-  .terendah {{ color: var(--hijau); font-size: .9rem; font-weight: 500; margin: .2rem 0 0; }}
-  .ke-riwayat {{ font-size: .9rem; margin: .2rem 0 0; }}
-  .ke-riwayat a {{ color: var(--redup); text-underline-offset: 3px; }}
-  .ke-riwayat a:hover {{ color: var(--teks); text-decoration-color: var(--oranye); }}
-  .harga {{ display: flex; align-items: center; gap: .9rem; }}
-  .label {{
-    /* bentuk label harga: ujung kiri runcing, sama dengan logo channel */
-    background: var(--oranye); color: #fff; font-weight: 700; font-size: 1.05rem;
-    padding: .35rem .8rem .35rem 1.3rem;
-    clip-path: polygon(.8rem 0, 100% 0, 100% 100%, .8rem 100%, 0 50%);
-    border-radius: 0 .4rem .4rem 0;
-  }}
-  .angka {{ display: flex; flex-direction: column; align-items: flex-end; font-variant-numeric: tabular-nums; min-width: 7.5rem; }}
-  .angka strong {{ font-size: 1.25rem; }}
-  .angka s {{ color: var(--redup); font-size: .9rem; }}
-
-  details {{ border-bottom: 1px solid var(--garis); padding: .9rem 0; }}
-  summary {{ cursor: pointer; font-weight: 500; }}
-  details p {{ color: var(--redup); margin: .6rem 0 0; max-width: 65ch; }}
-
-  footer {{ color: var(--redup); font-size: .85rem; border-top: 1px solid var(--garis); padding-top: 1.5rem; }}
-  .tautan-kaki {{ list-style: none; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin: 0 0 1rem; padding: 0; }}
-  .tautan-kaki a {{ text-underline-offset: 3px; }}
-  .tautan-kaki a:hover {{ color: var(--teks); }}
-
-  @media (max-width: 40rem) {{
-    .baris {{ grid-template-columns: 7rem 1fr; }}
-    .harga {{ grid-column: 1 / -1; justify-content: space-between; }}
-  }}
-</style>
-</head>
-<body>
-  <div class="wadah">
-    <header>
-      <div>
-        <p class="nama">{escape(nama_channel)}</p>
-        <h1>Diskon Steam hari ini, harga Rupiah asli</h1>
-        <p class="diperbarui">Diperbarui {_tanggal_panjang(sekarang)}, pukul {sekarang:%H.%M} WIB</p>
-      </div>
-      {tombol}
-    </header>
-    <main>{bagian_event}{bagian_epic}{bagian_steam}
-    <section aria-labelledby="h-tanya">
+    tanya = """
+    <section class="bagian" aria-labelledby="h-tanya">
       <h2 id="h-tanya">Pertanyaan umum</h2>
-      <details>
-        <summary>Kenapa harga di sini bisa beda dengan situs diskon lain?</summary>
-        <p>Banyak situs menampilkan harga dolar atau hasil konversinya. Steam memakai harga regional, jadi harga di Indonesia bisa jauh berbeda, dan diskon di luar negeri belum tentu berlaku di sini. Semua harga di halaman ini dicek langsung ke Steam region Indonesia.</p>
-      </details>
-      <details>
-        <summary>Seberapa sering halaman ini diperbarui?</summary>
-        <p>Setiap hari sekitar pukul 18.00 WIB. Harga bisa berubah sewaktu-waktu, jadi selalu cek halaman toko sebelum membeli.</p>
-      </details>
-      <details>
-        <summary>Apa arti label "Terendah sejak dicatat"?</summary>
-        <p>Harga game itu sedang paling murah sejak mulai dipantau di sini. Label hanya muncul untuk game yang harganya sudah dicatat minimal 30 hari.</p>
-      </details>
-    </section>
-    </main>
-    <footer>
-      <ul class="tautan-kaki">
-        <li><a href="/game/">Semua game</a></li>
-        <li><a href="/panduan/">Panduan</a></li>
-        <li><a href="/tentang/">Tentang</a></li>
-        <li><a href="/kebijakan-privasi/">Kebijakan Privasi</a></li>
-        <li><a href="/kontak/">Kontak</a></li>
-      </ul>
-      <p>Selamat menikmati berbagai game gratis dan berburu game diskon!</p>
-      <p>Harga diskon ini berasal dari Steam dan CheapShark serta game gratis berasal dari Epic Games Store. Halaman ini tidak berafiliasi dengan Valve maupun Epic Games. Link langsung menuju ke Toko Resmi </p>
-      <p> Powered by Sarathiel </p>
-    </footer>
-  </div>
-</body>
-</html>
-"""
+      <div class="tanya">
+        <details>
+          <summary>Kenapa harga di sini bisa beda dengan situs diskon lain?</summary>
+          <p>Banyak situs menampilkan harga dolar atau hasil konversinya. Steam memakai harga regional, jadi harga di Indonesia bisa jauh berbeda, dan diskon di luar negeri belum tentu berlaku di sini. Semua harga di halaman ini dicek langsung ke Steam region Indonesia.</p>
+        </details>
+        <details>
+          <summary>Seberapa sering halaman ini diperbarui?</summary>
+          <p>Setiap sore. Harga bisa berubah sewaktu-waktu, jadi selalu cek halaman toko sebelum membeli.</p>
+        </details>
+        <details>
+          <summary>Apa arti tulisan "Termurah sejak" di bawah nama game?</summary>
+          <p>Harga game itu sedang paling murah sejak tanggal tersebut. Tulisan ini hanya muncul untuk game yang harganya sudah dicatat minimal 30 hari.</p>
+        </details>
+      </div>
+    </section>"""
+
+    tambahan = (f'<meta name="google-site-verification" content="{escape(google_verifikasi)}">'
+                if google_verifikasi else "")
+    head = kepala(judul_halaman, deskripsi, kanonik=situs, og_gambar=og_gambar, tambahan=tambahan)
+    html = halaman_utuh(head, pita(link_telegram, hero=hero), bagian_epic + bagian_steam + tanya,
+                        script=SKRIP_BERANDA)
     with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as f:
         f.write(html)
 
