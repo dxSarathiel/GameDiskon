@@ -20,6 +20,14 @@ from html import escape
 from gaya import halaman_utuh, kepala, pita, tulis_css
 from halaman import BULAN, WIB, _rupiah, url_situs
 
+try:
+    from afiliasi import blok_halaman_game
+except Exception as err:          # afiliasi.py bermasalah: halaman tetap dibuat tanpa kotak voucher
+    print("afiliasi.py bermasalah, kotak voucher dilewati:", err)
+
+    def blok_halaman_game(harga_sen):
+        return ""
+
 MIN_HARI_INDEKS = 14        # halaman game boleh diindeks Google setelah datanya >= sekian hari
 BATAS_TIDAK_DIPANTAU = 3    # kalau tidak dicek selama > sekian hari, tampilkan pemberitahuan
 
@@ -182,7 +190,7 @@ def _html_game(r, situs, link_telegram, hari_ini):
       <div><dt>Harga normal</dt><dd>{fakta_normal}</dd></div>
       <div><dt>Termurah tercatat</dt><dd>{fakta_terendah}</dd></div>
       <div><dt>Dipantau sejak</dt><dd>{_tgl(r['mulai'])}</dd></div>
-    </dl>
+    </dl>{blok_halaman_game(kini)}
     <section class="struk" aria-labelledby="h-riwayat">
       <h2 id="h-riwayat">Riwayat harga</h2>
       <p class="catatan">Setiap baris adalah hari ketika harganya berubah. Dicek setiap hari.</p>
