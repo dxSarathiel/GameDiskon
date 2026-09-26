@@ -1,127 +1,164 @@
 <?php
 /*
- * Inti bot alarm harga GameDiskon (dipakai webhook.php, periksa.php, pasang.php).
- *
- * Rahasia TIDAK disimpan di sini, karena repo ini publik. Token bot dan kunci-kunci
- * disimpan di luar folder situs, di:  /home/<akun-cpanel>/gamediskon-bot/config.php
- * Data alarm juga disimpan di folder itu (alarm.json), jadi tidak bisa dibuka dari web.
+ * Webhook bot alarm harga GameDiskon. Telegram mengirim setiap pesan ke sini.
+ * Perintah: /start, /daftar, /hapussemua, /bantuan, atau cukup ketik nama game.
  */
+define('GAMEDISKON_BOT', true);
+require __DIR__ . '/inti.php';
 
-if (!defined('GAMEDISKON_BOT')) { http_response_code(404); exit; }
+// Hanya terima kiriman yang membawa kunci rahasia webhook (diatur lewat pasang.php)
+$kunci = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
+if (!hash_equals((string)konfigurasi()['webhook_rahasia'], (string)$kunci)) { http_response_code(403); exit; }
 
-define('FOLDER_RAHASIA', getenv('GAMEDISKON_BOT_DIR') ?: dirname(__DIR__, 2) . '/gamediskon-bot');
-define('FILE_HARGA', dirname(__DIR__) . '/data/harga.json');
-define('SITUS', 'https://gamediskon.my.id/');
-define('MAKS_ALARM_PER_ORANG', 10);
-define('MAKS_HASIL_CARI', 6);
+$update = json_decode(file_get_contents('php://input'), true);
+if (!is_array($update)) { exit; }
 
-// Tautan voucher Steam Wallet (afiliasi Lapakgaming), sama dengan afiliasi.py
-define('LINK_VOUCHER', 'https://www.lapakgaming.com/id-id/voucher-steam-wallet?utm_campaign=Sarathiel&utm_source=Affiliate&utm_medium=LGA');
-define('KODE_BARU', 'LGCSNEW');
-
-function konfigurasi() {
-    static $k = null;
-    if ($k === null) {
-        $path = FOLDER_RAHASIA . '/config.php';
-        if (!is_file($path)) { http_response_code(500); exit("config.php belum dibuat di " . FOLDER_RAHASIA); }
-        $k = require $path;
+if (isset($update['callback_query'])) {
+    $q = $update['callback_query'];
+    tg('answerCallbackQuery', ['callback_query_id' => $q['id']]);
+    tangani_tombol((string)$q['message']['chat']['id'], (string)($q['data'] ?? ''));
+} elseif (isset($update['message']['text'])) {
+    $m = $update['message'];
+    if (($m['chat']['type'] ?? '') === 'private') {       // abaikan grup dan channel
+        tangani_pesan((string)$m['chat']['id'], trim($m['text']));
     }
-    return $k;
 }
+echo 'ok';
 
-// ---------- Telegram ----------
-function tg($metode, $data) {
-    $api = getenv('GAMEDISKON_API') ?: 'https://api.telegram.org';
-    $url = $api . '/bot' . konfigurasi()['token'] . '/' . $metode;
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($data),
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 20,
-    ]);
-    $hasil = curl_exec($ch);
-    curl_close($ch);
-    $json = json_decode((string)$hasil, true);
-    return is_array($json) ? $json : ['ok' => false, 'description' => 'tidak ada jawaban'];
-}
+// ---------------------------------------------------------------------------
 
-function kirim($chat, $teks, $tombol = null) {
-    $data = ['chat_id' => $chat, 'text' => $teks, 'parse_mode' => 'HTML', 'disable_web_page_preview' => true];
-    if ($tombol) { $data['reply_markup'] = ['inline_keyboard' => $tombol]; }
-    return tg('sendMessage', $data);
-}
-
-function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
-
-function rupiah($sen) { return 'Rp ' . number_format(intdiv((int)$sen, 100), 0, ',', '.'); }
-
-// ---------- Data harga (dibuat bot harian: docs/data/harga.json) ----------
-function data_harga() {
-    static $d = null;
-    if ($d === null) {
-        $d = is_file(FILE_HARGA) ? json_decode(file_get_contents(FILE_HARGA), true) : null;
-        if (!is_array($d) || !isset($d['game'])) { $d = ['game' => [], 'diperbarui' => '']; }
+function tangani_pesan($chat, $teks) {
+    if (preg_match('/^\/start(?:\s+(\d+))?/', $teks, $m)) {
+        if (!empty($m[1]) && game($m[1])) { tawarkan_target($chat, $m[1]); return; }
+        kirim($chat, sambutan());
+        return;
     }
-    return $d;
-}
-
-function game($appid) {
-    $g = data_harga()['game'][(string)$appid] ?? null;
-    if (!$g) { return null; }
-    // Urutan kolom: nama, slug, harga sekarang, harga normal, diskon, termurah tercatat (semua dalam sen)
-    return ['appid' => (string)$appid, 'nama' => $g[0], 'slug' => $g[1], 'harga' => (int)$g[2],
-            'normal' => (int)$g[3], 'diskon' => (int)$g[4], 'termurah' => (int)$g[5]];
-}
-
-function url_halaman($g) {
-    return SITUS . 'game/' . $g['appid'] . ($g['slug'] ? '-' . $g['slug'] : '') . '/';
-}
-
-function sederhanakan($s) {
-    return trim(preg_replace('/[^a-z0-9]+/', ' ', strtolower($s)));
-}
-
-function cari_game($kata) {
-    $q = sederhanakan($kata);
-    if ($q === '') { return []; }
-    $bagian = explode(' ', $q);
-    $hasil = [];
-    foreach (data_harga()['game'] as $appid => $g) {
-        $nama = sederhanakan($g[0]);
-        $cocok = true;
-        foreach ($bagian as $b) { if (strpos($nama, $b) === false) { $cocok = false; break; } }
-        if (!$cocok) { continue; }
-        // Nama yang diawali kata kunci dan lebih pendek ditaruh di atas
-        $skor = (strpos($nama, $q) === 0 ? 0 : 1) * 1000 + strlen($nama);
-        $hasil[] = [$skor, (string)$appid];
+    if (preg_match('/^\/(daftar|alarm)\b/', $teks)) { tampilkan_daftar($chat); return; }
+    if (preg_match('/^\/hapussemua\b/', $teks)) {
+        ubah_data(function (&$d) use ($chat) { unset($d['alarm'][$chat], $d['menunggu'][$chat]); });
+        kirim($chat, 'Semua alarm-mu sudah dihapus, dan data chat-mu tidak lagi kami simpan.');
+        return;
     }
-    usort($hasil, function ($a, $b) { return $a[0] <=> $b[0]; });
-    return array_slice(array_map(function ($x) { return $x[1]; }, $hasil), 0, MAKS_HASIL_CARI);
+    if (preg_match('/^\/(bantuan|help)\b/', $teks)) { kirim($chat, sambutan()); return; }
+    if ($teks !== '' && $teks[0] === '/') { kirim($chat, 'Perintah itu tidak dikenal. Ketik /bantuan untuk melihat caranya.'); return; }
+
+    // Sedang menunggu angka target untuk game yang baru dipilih?
+    $menunggu = baca_data()['menunggu'][$chat] ?? null;
+    $angka = baca_angka($teks);
+    if ($menunggu && $angka !== null) { simpan_alarm($chat, $menunggu, $angka * 100); return; }
+
+    // Selain itu, anggap sebagai pencarian nama game
+    $hasil = cari_game($teks);
+    if (!$hasil) {
+        kirim($chat, 'Game dengan nama "<b>' . h($teks) . '</b>" belum ada di daftar yang kami pantau. '
+            . 'Coba ketik sebagian namanya saja, misalnya <i>witcher</i>, atau lihat daftarnya di ' . SITUS . 'game/');
+        return;
+    }
+    $tombol = [];
+    foreach ($hasil as $appid) {
+        $g = game($appid);
+        $tombol[] = [['text' => $g['nama'] . ' (' . rupiah($g['harga']) . ')', 'callback_data' => 'pilih:' . $appid]];
+    }
+    kirim($chat, 'Pilih game yang kamu maksud:', $tombol);
 }
 
-// ---------- Penyimpanan alarm (file JSON di luar folder situs, dikunci saat ditulis) ----------
-function ubah_data($fungsi) {
-    if (!is_dir(FOLDER_RAHASIA)) { mkdir(FOLDER_RAHASIA, 0700, true); }
-    $fp = fopen(FOLDER_RAHASIA . '/alarm.json', 'c+');
-    flock($fp, LOCK_EX);
-    $isi = stream_get_contents($fp);
-    $data = json_decode($isi ?: '{}', true);
-    if (!is_array($data)) { $data = []; }
-    $data += ['alarm' => [], 'menunggu' => []];
-    $hasil = $fungsi($data);
-    ftruncate($fp, 0);
-    rewind($fp);
-    fwrite($fp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    fflush($fp);
-    flock($fp, LOCK_UN);
-    fclose($fp);
-    return $hasil;
+function tangani_tombol($chat, $data) {
+    $b = explode(':', $data);
+    if ($b[0] === 'pilih' && isset($b[1])) { tawarkan_target($chat, $b[1]); }
+    elseif ($b[0] === 'target' && isset($b[1], $b[2])) { simpan_alarm($chat, $b[1], (int)$b[2]); }
+    elseif ($b[0] === 'hapus' && isset($b[1])) {
+        ubah_data(function (&$d) use ($chat, $b) {
+            $d['alarm'][$chat] = array_values(array_filter($d['alarm'][$chat] ?? [], function ($a) use ($b) { return $a['appid'] !== $b[1]; }));
+            if (!$d['alarm'][$chat]) { unset($d['alarm'][$chat]); }
+        });
+        $g = game($b[1]);
+        kirim($chat, 'Alarm untuk <b>' . h($g ? $g['nama'] : $b[1]) . '</b> sudah dihapus.');
+    }
 }
 
-function baca_data() { return ubah_data(function ($d) { return $d; }); }
+function tawarkan_target($chat, $appid) {
+    $g = game($appid);
+    if (!$g) { kirim($chat, 'Game itu tidak ditemukan.'); return; }
+    $kini = $g['harga'];
+    $normal = $g['normal'] ?: $kini;
+    $pilihan = [];
+    $tambah = function ($label, $target) use (&$pilihan, $kini) {
+        $target = intdiv($target, 100) * 100;                      // bulatkan ke Rupiah penuh
+        if ($target > 0 && $target < $kini && !isset($pilihan[$target])) { $pilihan[$target] = $label . ' (' . rupiah($target) . ')'; }
+    };
+    if ($kini >= $normal) {
+        // Belum diskon: target dihitung dari harga normal
+        $tambah('Diskon berapa pun', $normal - 100);
+        $tambah('Setengah harga', intdiv($normal, 2));
+        $tambah('Diskon 75%', intdiv($normal, 4));
+    } else {
+        // Sudah diskon: target dihitung dari harga sekarang
+        $tambah('Lebih murah dari sekarang', $kini - 100);
+        $tambah('Turun 25% lagi', intdiv($kini * 3, 4));
+        $tambah('Turun 50% lagi', intdiv($kini, 2));
+    }
+    if ($g['termurah'] && $g['termurah'] < $kini) { $tambah('Setara termurah tercatat', $g['termurah']); }
+    krsort($pilihan);
+    $tombol = [];
+    foreach ($pilihan as $target => $label) { $tombol[] = [['text' => $label, 'callback_data' => 'target:' . $appid . ':' . $target]]; }
 
-function baris_voucher() {
-    return '💳 <a href="' . h(LINK_VOUCHER) . '">Isi saldo Steam Wallet di Lapakgaming</a> (kode <b>' . KODE_BARU . '</b> untuk pengguna baru)';
+    ubah_data(function (&$d) use ($chat, $appid) { $d['menunggu'][$chat] = $appid; });
+    $status = $g['diskon'] > 0 ? 'sedang diskon ' . $g['diskon'] . '% menjadi <b>' . rupiah($kini) . '</b>' : 'sekarang <b>' . rupiah($kini) . '</b>';
+    kirim($chat, '<b>' . h($g['nama']) . '</b> ' . $status . ' (harga normal ' . rupiah($normal) . ").\n\n"
+        . 'Kabari kamu kalau harganya turun sampai berapa? Pilih di bawah, atau ketik angkanya, misalnya <i>50000</i> atau <i>50rb</i>.', $tombol);
+}
+
+function simpan_alarm($chat, $appid, $target) {
+    $g = game($appid);
+    if (!$g || $target <= 0) { kirim($chat, 'Target harga tidak valid.'); return; }
+    if ($g['harga'] <= $target) {
+        ubah_data(function (&$d) use ($chat) { unset($d['menunggu'][$chat]); });
+        kirim($chat, 'Harga <b>' . h($g['nama']) . '</b> sekarang ' . rupiah($g['harga']) . ', sudah di bawah targetmu. '
+            . 'Tidak perlu alarm, bisa langsung dibeli: <a href="https://store.steampowered.com/app/' . h($appid) . '/">buka di Steam</a>.');
+        return;
+    }
+    $hasil = ubah_data(function (&$d) use ($chat, $appid, $target) {
+        $daftar = array_values(array_filter($d['alarm'][$chat] ?? [], function ($a) use ($appid) { return $a['appid'] !== $appid; }));
+        if (count($daftar) >= MAKS_ALARM_PER_ORANG) { return 'penuh'; }
+        $daftar[] = ['appid' => $appid, 'target' => $target, 'dibuat' => date('Y-m-d')];
+        $d['alarm'][$chat] = $daftar;
+        unset($d['menunggu'][$chat]);
+        return 'ok';
+    });
+    if ($hasil === 'penuh') {
+        kirim($chat, 'Kamu sudah punya ' . MAKS_ALARM_PER_ORANG . ' alarm, batas maksimalnya. Hapus salah satu lewat /daftar dulu.');
+        return;
+    }
+    kirim($chat, '🔔 Siap! Kamu akan dikabari kalau <b>' . h($g['nama']) . '</b> turun ke <b>' . rupiah($target) . "</b> atau lebih murah.\n\n"
+        . 'Harga dicek sekali sehari setiap sore. Lihat semua alarm-mu dengan /daftar.');
+}
+
+function tampilkan_daftar($chat) {
+    $daftar = baca_data()['alarm'][$chat] ?? [];
+    if (!$daftar) { kirim($chat, 'Kamu belum punya alarm. Ketik nama game untuk memasang alarm pertama.'); return; }
+    $baris = ['<b>Alarm harga kamu</b>'];
+    $tombol = [];
+    foreach ($daftar as $a) {
+        $g = game($a['appid']);
+        $nama = $g ? $g['nama'] : 'App ' . $a['appid'];
+        $baris[] = '• ' . h($nama) . ': target ' . rupiah($a['target']) . ($g ? ', sekarang ' . rupiah($g['harga']) : '');
+        $tombol[] = [['text' => '❌ Hapus ' . $nama, 'callback_data' => 'hapus:' . $a['appid']]];
+    }
+    kirim($chat, implode("\n", $baris), $tombol);
+}
+
+function baca_angka($teks) {
+    $t = strtolower(str_replace(['rp', ' '], '', $teks));
+    if (preg_match('/^(\d+(?:[.,]\d+)?)(rb|ribu|k)$/', $t, $m)) { return (int)round((float)str_replace(',', '.', $m[1]) * 1000); }
+    $t = str_replace(['.', ','], '', $t);
+    return ctype_digit($t) && strlen($t) <= 9 ? (int)$t : null;
+}
+
+function sambutan() {
+    return "👋 Halo! Ini <b>alarm harga GameDiskon</b>.\n\n"
+        . "Ketik nama game Steam, pilih target harganya, dan kamu akan dikabari di sini saat harganya di Steam Indonesia turun sampai target itu.\n\n"
+        . "• Ketik nama game, misalnya <i>hades</i>\n"
+        . "• /daftar untuk melihat dan menghapus alarm\n"
+        . "• /hapussemua untuk menghapus semua alarm dan data chat-mu\n\n"
+        . "Harga dicek sekali sehari setiap sore. Maksimal " . MAKS_ALARM_PER_ORANG . " alarm per orang.";
 }
