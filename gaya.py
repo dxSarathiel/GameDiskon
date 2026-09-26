@@ -1,0 +1,376 @@
+"""
+Sistem tampilan bersama untuk semua halaman gamediskon.my.id.
+
+Tema: "rak promo minimarket" — label harga kuning di tepi rak, angka potongan merah,
+harga coret, dan stempel GRATIS. Semua halaman memakai satu file gaya: docs/gaya.css.
+Mengubah tampilan cukup di file ini; halaman lain ikut berubah otomatis.
+"""
+
+import hashlib
+import json
+import os
+from html import escape
+
+LINK_TELEGRAM = ""   # diisi radar_diskon.py saat berjalan, supaya tombol Telegram muncul di semua halaman
+
+FONT_URL = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap"
+
+CSS = r"""
+/* ---------- Token ---------- */
+:root {
+  --kertas: #ffffff;
+  --rak: #f1f3f7;
+  --garis: #d9dee8;
+  --tinta: #16181d;
+  --redup: #5b6272;
+  --biru: #1c3faa;
+  --biru-tua: #142e7d;
+  --kuning: #ffd60a;
+  --merah: #d7191f;
+  --hijau: #0f7b3f;
+  --sempit: 68%;          /* lebar huruf untuk angka & judul, gaya poster promo */
+  --lebar-isi: 72rem;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--kertas); color: var(--tinta);
+  font-family: "Archivo", system-ui, sans-serif; font-size: 1rem; line-height: 1.55;
+}
+img { max-width: 100%; height: auto; }   /* biarkan aspect-ratio yang menentukan tinggi */
+a { color: var(--biru); text-underline-offset: 3px; }
+a:hover { color: var(--biru-tua); }
+:focus-visible { outline: 3px solid var(--biru); outline-offset: 3px; border-radius: 2px; }
+.pita :focus-visible { outline-color: var(--kuning); }
+.wadah { max-width: var(--lebar-isi); margin: 0 auto; padding: 0 1.25rem; }
+.lompat { position: absolute; left: -999px; }
+.lompat:focus { left: 1rem; top: 1rem; z-index: 9; background: var(--kuning); color: var(--tinta); padding: .5rem 1rem; }
+
+/* ---------- Pita biru di atas ---------- */
+.pita { background: var(--biru); color: #fff; }
+.pita a { color: #fff; }
+.nav { display: flex; align-items: center; gap: 1.5rem; padding: 1rem 0; flex-wrap: wrap; }
+.logo {
+  display: inline-block; background: var(--kuning); color: var(--tinta) !important; text-decoration: none;
+  font-weight: 900; font-stretch: var(--sempit); font-size: 1.6rem; line-height: 1; letter-spacing: .01em;
+  padding: .35rem .7rem .3rem; transform: rotate(-2deg); box-shadow: 3px 3px 0 var(--biru-tua);
+}
+.logo span { color: var(--merah); }
+.nav ul { list-style: none; display: flex; gap: 1.25rem; margin: 0 0 0 auto; padding: 0; flex-wrap: wrap; }
+.nav ul a { text-decoration: none; font-weight: 600; }
+.nav ul a:hover, .nav ul a[aria-current] { text-decoration: underline; text-decoration-thickness: 2px; color: #fff; }
+.tombol-tg {
+  background: var(--kuning); color: var(--tinta) !important; text-decoration: none; font-weight: 800;
+  padding: .55rem 1rem; border-radius: 3px; white-space: nowrap;
+}
+.tombol-tg:hover { background: #fff; }
+.hero { padding: 2.5rem 0 3rem; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem 3rem; align-items: center; }
+.unggulan { display: flex; flex-direction: column; align-items: flex-start; text-decoration: none; color: #fff; max-width: 22rem; }
+.unggulan-ket { font-weight: 700; color: #dfe5ff; margin-bottom: .25rem; }
+.unggulan .stiker { color: var(--tinta); margin: .4rem 0 1rem; box-shadow: 6px 6px 0 var(--biru-tua); }
+.unggulan-nama { font-weight: 900; font-stretch: var(--sempit); font-size: 1.6rem; line-height: 1.1; }
+.unggulan:hover .unggulan-nama { text-decoration: underline; text-decoration-thickness: 2px; }
+.hero h1 {
+  font-weight: 900; font-stretch: var(--sempit); font-size: clamp(2.6rem, 8vw, 5.5rem);
+  line-height: .95; letter-spacing: -.01em; margin: 0; max-width: 14ch;
+}
+.hero p { font-size: 1.1rem; margin: 1.25rem 0 0; max-width: 48ch; color: #dfe5ff; }
+.hero .event { display: inline-block; margin-top: 1.25rem; background: var(--kuning); color: var(--tinta);
+               font-weight: 700; padding: .45rem .8rem; max-width: none; }
+
+/* ---------- Judul & teks umum ---------- */
+main { padding: 2.5rem 0 4rem; }
+.bagian { margin-bottom: 4rem; }
+h1, h2, h3 { font-stretch: var(--sempit); font-weight: 900; line-height: 1.05; }
+.judul-halaman { font-size: clamp(2.2rem, 6vw, 3.8rem); margin: 0 0 1rem; max-width: 20ch; }
+h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0 0 .35rem; }
+h3 { font-size: 1.35rem; }
+.catatan { color: var(--redup); margin: 0 0 1.5rem; max-width: 62ch; }
+.jejak { font-size: .9rem; color: var(--redup); margin: 0 0 1.25rem; }
+.jejak ol { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; }
+.jejak li + li::before { content: "/"; margin-right: .4rem; color: var(--garis); }
+.jejak a { color: var(--redup); }
+
+/* ---------- Game gratis Epic ---------- */
+.gratis { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem 1.5rem;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); }
+.gratis a { text-decoration: none; color: var(--tinta); display: block; position: relative; }
+.gratis img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 3px; background: var(--rak); }
+.stempel {
+  position: absolute; top: -.9rem; left: -.6rem; width: 5rem; height: 5rem; border-radius: 50%;
+  display: grid; place-items: center; transform: rotate(-12deg);
+  background: var(--merah); color: #fff; font-weight: 900; font-stretch: var(--sempit); font-size: 1.3rem;
+  box-shadow: 0 0 0 3px var(--kertas), 0 0 0 5px var(--merah);
+}
+.gratis h3 { margin: .9rem 0 .2rem; font-size: 1.5rem; }
+.gratis a:hover h3 { text-decoration: underline; text-decoration-thickness: 2px; }
+.batas { margin: 0; color: var(--redup); }
+.sisa { color: var(--merah); font-weight: 800; }
+
+/* ---------- Kontrol saring & urut ---------- */
+.kontrol { display: flex; flex-wrap: wrap; gap: .6rem 1.5rem; align-items: center; margin: 0 0 2rem; }
+.saring { display: flex; flex-wrap: wrap; gap: .5rem; }
+.saring button, .kontrol select {
+  font: inherit; font-weight: 600; font-size: .95rem; color: var(--tinta); background: var(--kertas);
+  border: 2px solid var(--garis); border-radius: 3px; padding: .4rem .8rem; cursor: pointer;
+}
+.saring button:hover, .kontrol select:hover { border-color: var(--tinta); }
+.saring button[aria-pressed="true"] { background: var(--tinta); border-color: var(--tinta); color: #fff; }
+.kontrol label { display: flex; gap: .5rem; align-items: center; color: var(--redup); }
+.hasil-saring { color: var(--redup); margin: -1rem 0 1.5rem; min-height: 1.5em; }
+
+/* ---------- Rak diskon Steam ----------
+   Tiap baris grid berdiri di atas rel biru (garis bawah tebal yang menyambung antar barang),
+   dan label kuning menempel di tepi rak seperti di minimarket. */
+.rak { list-style: none; margin: 0; padding: 0; display: grid; column-gap: 0; row-gap: 2.75rem;
+       grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr)); }
+.barang { display: flex; flex-direction: column; padding: 0 .75rem; border-bottom: 10px solid var(--biru); }
+.barang[hidden] { display: none; }
+.barang > a { text-decoration: none; color: var(--tinta); display: block; }
+.barang img { display: block; width: 100%; aspect-ratio: 460 / 215; object-fit: cover; border-radius: 3px 3px 0 0; background: var(--rak); }
+.barang h3 { font-size: 1.25rem; margin: .7rem 0 .15rem; }
+.barang > a:hover h3 { text-decoration: underline; text-decoration-thickness: 2px; }
+.barang .ulasan { margin: 0; color: var(--redup); font-size: .92rem; }
+.barang .terendah { margin: .3rem 0 0; color: var(--hijau); font-weight: 700; font-size: .92rem; }
+.label-rak { margin-top: auto; padding-top: .9rem; }
+.label-rak div { display: flex; align-items: stretch; background: var(--kuning); }
+.potong {
+  background: var(--merah); color: #fff; font-weight: 900; font-stretch: var(--sempit);
+  font-size: 1.5rem; line-height: 1; padding: .5rem .55rem; display: flex; align-items: center;
+}
+.label-rak .harga { padding: .35rem .6rem .3rem; display: flex; flex-direction: column; justify-content: center; }
+.label-rak strong { font-weight: 900; font-stretch: var(--sempit); font-size: 1.7rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.label-rak s { font-size: .82rem; color: #6b5a00; font-variant-numeric: tabular-nums; }
+.beli { display: inline-block; font-size: .9rem; font-weight: 700; margin: .45rem 0 .6rem; }
+.kosong { background: var(--rak); padding: 1.25rem; max-width: 62ch; }
+
+/* ---------- Tanya jawab ---------- */
+.tanya { max-width: 62ch; border-top: 2px solid var(--tinta); }
+.tanya details { border-bottom: 1px solid var(--garis); padding: .9rem 0; }
+.tanya summary { cursor: pointer; font-weight: 700; font-size: 1.05rem; }
+.tanya p { margin: .6rem 0 0; color: var(--redup); }
+
+/* ---------- Halaman game ---------- */
+.produk { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 2.5rem; align-items: center; margin-bottom: 2.5rem; }
+.produk img { display: block; width: 100%; aspect-ratio: 460 / 215; object-fit: cover; border-radius: 3px; background: var(--rak); }
+.stiker {
+  display: inline-flex; align-items: stretch; background: var(--kuning); transform: rotate(-2deg);
+  box-shadow: 5px 5px 0 var(--tinta); margin: .5rem 0 1.5rem;
+}
+.stiker .potong { font-size: 2.4rem; padding: .6rem .8rem; }
+.stiker .harga { padding: .6rem 1rem .5rem; display: flex; flex-direction: column; justify-content: center; }
+.stiker strong { font-weight: 900; font-stretch: var(--sempit); font-size: clamp(2.4rem, 6vw, 3.4rem); line-height: .95; font-variant-numeric: tabular-nums; }
+.stiker s { color: #6b5a00; font-variant-numeric: tabular-nums; }
+.kalimat { margin: 0 0 1.25rem; max-width: 46ch; font-size: 1.08rem; }
+.kalimat.baik { color: var(--hijau); font-weight: 700; }
+.tombol {
+  display: inline-block; background: var(--biru); color: #fff !important; text-decoration: none; font-weight: 800;
+  padding: .75rem 1.2rem; border-radius: 3px; margin: 0 .5rem .5rem 0;
+}
+.tombol:hover { background: var(--biru-tua); }
+.tombol.kedua { background: var(--kertas); color: var(--tinta) !important; box-shadow: inset 0 0 0 2px var(--tinta); }
+.tombol.kedua:hover { background: var(--rak); }
+.fakta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 0 3rem; border-top: 2px solid var(--tinta); border-bottom: 1px solid var(--garis); }
+.fakta div { padding: 1rem 1rem 1rem 0; }
+.fakta div + div { padding-left: 1rem; border-left: 1px solid var(--garis); }
+.fakta dt { color: var(--redup); font-size: .92rem; }
+.fakta dd { margin: .1rem 0 0; font-weight: 900; font-stretch: var(--sempit); font-size: 1.7rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.fakta dd small { display: block; font-weight: 400; font-stretch: 100%; font-size: .88rem; color: var(--redup); }
+.peringatan { background: #fff4c2; border-left: 5px solid var(--kuning); padding: .8rem 1rem; margin: 0 0 2rem; max-width: 62ch; }
+
+/* Riwayat harga sebagai struk belanja */
+.struk {
+  max-width: 30rem; background: var(--rak); padding: 1.75rem 1.5rem 2rem; position: relative;
+  /* tepi atas dan bawah bergerigi seperti kertas struk yang disobek */
+  --gigi: radial-gradient(circle at 50% 100%, transparent .4rem, #000 .45rem) 50% 100% / 1rem 51% repeat-x,
+          radial-gradient(circle at 50% 0, transparent .4rem, #000 .45rem) 50% 0 / 1rem 51% repeat-x;
+  -webkit-mask: var(--gigi); mask: var(--gigi);
+}
+.struk h2 { font-size: 1.6rem; text-align: center; margin: .25rem 0 .25rem; }
+.struk .catatan { text-align: center; font-size: .9rem; margin: 0 auto 1rem; }
+.struk table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.struk th { font-weight: 600; color: var(--redup); font-size: .85rem; text-align: left; padding: .4rem 0; border-bottom: 2px dashed #b9c1d1; }
+.struk td { padding: .55rem 0; border-bottom: 1px dashed #b9c1d1; }
+.struk .angka { text-align: right; }
+.struk td.angka strong { font-weight: 800; }
+.struk .turun { color: var(--merah); font-weight: 800; }
+.struk .normal { color: var(--redup); }
+.struk tfoot td { border-bottom: 0; padding-top: .9rem; font-weight: 800; }
+
+/* ---------- Daftar semua game ---------- */
+.cari { display: block; margin: 0 0 1.5rem; max-width: 30rem; }
+.cari input { width: 100%; font: inherit; font-size: 1.05rem; padding: .7rem .9rem; border: 2px solid var(--tinta); border-radius: 3px; }
+.daftar { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--tinta); max-width: 52rem; }
+.daftar li { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--garis); }
+.daftar li[hidden] { display: none; }
+.daftar a { color: var(--tinta); font-weight: 600; text-decoration: none; }
+.daftar a:hover { text-decoration: underline; }
+.daftar .harga { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.daftar .harga b { color: var(--merah); font-weight: 900; font-stretch: var(--sempit); font-size: 1.15rem; margin-right: .4rem; }
+
+/* ---------- Artikel & halaman info ---------- */
+.prosa { max-width: 66ch; }
+.prosa .meta { color: var(--redup); margin: -.25rem 0 2rem; }
+.prosa h2 { font-size: 1.9rem; margin: 2.5rem 0 .6rem; }
+.prosa h3 { font-size: 1.35rem; margin: 1.75rem 0 .4rem; }
+.prosa p, .prosa ul, .prosa ol { margin: 0 0 1.1rem; }
+.prosa ul, .prosa ol { padding-left: 1.3rem; }
+.prosa li { margin-bottom: .45rem; }
+.prosa li::marker { color: var(--merah); font-weight: 800; }
+.prosa blockquote { margin: 0 0 1.25rem; padding: .8rem 1.1rem; background: var(--rak); border-left: 5px solid var(--biru); }
+.prosa blockquote p:last-child { margin-bottom: 0; }
+.kotak-data { background: var(--kuning); padding: 1rem 1.2rem; margin: 0 0 1.5rem; }
+.kotak-data p { margin: 0 0 .4rem !important; font-weight: 700; }
+.kotak-data ul { margin: 0 !important; }
+.kotak-data a { color: var(--tinta); font-weight: 700; }
+.daftar-artikel { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--tinta); max-width: 66ch; }
+.daftar-artikel li { padding: 1.25rem 0; border-bottom: 1px solid var(--garis); }
+.daftar-artikel h2 { font-size: 1.7rem; margin: 0 0 .3rem; }
+.daftar-artikel h2 a { color: var(--tinta); text-decoration: none; }
+.daftar-artikel h2 a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+.daftar-artikel p { color: var(--redup); margin: 0; }
+
+/* ---------- Kaki ---------- */
+.kaki { background: var(--rak); border-top: 10px solid var(--biru); padding: 2rem 0 3rem; color: var(--redup); font-size: .92rem; }
+.kaki ul { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin: 0 0 1rem; padding: 0; }
+.kaki a { color: var(--tinta); font-weight: 600; }
+.kaki p { margin: 0 0 .4rem; max-width: 70ch; }
+
+/* ---------- Layar kecil ---------- */
+@media (max-width: 44rem) {
+  .nav { gap: .9rem; }
+  .nav ul { margin: 0; order: 3; width: 100%; }
+  .tombol-tg { margin-left: auto; }
+  .hero { padding: 1.5rem 0 2.25rem; grid-template-columns: 1fr; }
+  .unggulan .stiker .potong { font-size: 1.8rem; }
+  .unggulan .stiker strong { font-size: 2.2rem; }
+  .rak { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 2.25rem; }
+  .barang { padding: 0 .4rem; }
+  .barang h3 { font-size: 1.05rem; }
+  .potong { font-size: 1.15rem; padding: .4rem .4rem; }
+  .label-rak strong { font-size: 1.3rem; }
+  .label-rak .harga { padding: .3rem .45rem; }
+  .produk { grid-template-columns: 1fr; gap: 1.25rem; }
+  .fakta { grid-template-columns: 1fr; }
+  .fakta div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--garis); }
+}
+@media (max-width: 22rem) {
+  .rak { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}
+"""
+
+
+def tulis_css(folder="docs"):
+    """Tulis docs/gaya.css dan kembalikan alamatnya beserta penanda versi,
+    supaya browser mengambil versi baru setiap kali tampilannya diubah."""
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, "gaya.css")
+    try:
+        lama = open(path, encoding="utf-8").read()
+    except FileNotFoundError:
+        lama = None
+    if lama != CSS:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(CSS)
+    return "/gaya.css?v=" + hashlib.sha1(CSS.encode()).hexdigest()[:8]
+
+
+HREF_CSS = "/gaya.css?v=" + hashlib.sha1(CSS.encode()).hexdigest()[:8]
+
+
+def kepala(judul, deskripsi, kanonik="", og_gambar="", noindex=False, jsonld=None, tambahan=""):
+    """Isi <head> yang sama untuk semua halaman."""
+    baris = [
+        '<meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        f"<title>{escape(judul)}</title>",
+        f'<meta name="description" content="{escape(deskripsi)}">',
+    ]
+    if kanonik:
+        baris.append(f'<link rel="canonical" href="{escape(kanonik)}">')
+    if noindex:
+        baris.append('<meta name="robots" content="noindex, follow">')
+    baris += [
+        '<meta property="og:type" content="website">',
+        '<meta property="og:site_name" content="GameDiskon">',
+        f'<meta property="og:title" content="{escape(judul)}">',
+        f'<meta property="og:description" content="{escape(deskripsi)}">',
+    ]
+    if kanonik:
+        baris.append(f'<meta property="og:url" content="{escape(kanonik)}">')
+    if og_gambar:
+        baris.append(f'<meta property="og:image" content="{escape(og_gambar)}">')
+    baris += [
+        '<meta name="theme-color" content="#1c3faa">',
+        '<link rel="preconnect" href="https://fonts.googleapis.com">',
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+        f'<link rel="stylesheet" href="{FONT_URL}">',
+        f'<link rel="stylesheet" href="{HREF_CSS}">',
+    ]
+    if jsonld:
+        baris.append(f'<script type="application/ld+json">{json.dumps(jsonld, ensure_ascii=False)}</script>')
+    if tambahan:
+        baris.append(tambahan)
+    return "\n".join(baris)
+
+
+def pita(link_telegram=None, aktif="", hero=""):
+    """Pita biru di atas: logo, menu, tombol Telegram, dan (khusus beranda) judul besar."""
+    menu = [("/game/", "Semua game", "game"), ("/panduan/", "Panduan", "panduan")]
+    li = "".join(f'<li><a href="{u}"{" aria-current=\"page\"" if k == aktif else ""}>{t}</a></li>'
+                 for u, t, k in menu)
+    if link_telegram is None:
+        link_telegram = LINK_TELEGRAM
+    tg = (f'<a class="tombol-tg" href="https://{escape(link_telegram)}" rel="noopener">Ikuti di Telegram</a>'
+          if link_telegram else "")
+    return f"""<a class="lompat" href="#isi">Langsung ke isi</a>
+<header class="pita">
+  <div class="wadah">
+    <nav class="nav" aria-label="Menu utama">
+      <a class="logo" href="/">Game<span>Diskon</span></a>
+      <ul>{li}</ul>
+      {tg}
+    </nav>{hero}
+  </div>
+</header>"""
+
+
+def kaki():
+    return """<footer class="kaki">
+  <div class="wadah">
+    <ul>
+      <li><a href="/game/">Semua game</a></li>
+      <li><a href="/panduan/">Panduan</a></li>
+      <li><a href="/tentang/">Tentang</a></li>
+      <li><a href="/kebijakan-privasi/">Kebijakan Privasi</a></li>
+      <li><a href="/kontak/">Kontak</a></li>
+    </ul>
+    <p>Selamat berburu game diskon dan game gratis! Harga dicek setiap hari dari Steam region Indonesia dan CheapShark, game gratis dari Epic Games Store. Semua tautan beli menuju toko resminya, jadi selalu cek harga di sana sebelum membayar.</p>
+    <p>GameDiskon tidak berafiliasi dengan Valve maupun Epic Games. Powered by Sarathiel.</p>
+  </div>
+</footer>"""
+
+
+def halaman_utuh(head, header, isi, script=""):
+    """Rangkai satu halaman HTML lengkap."""
+    return f"""<!doctype html>
+<html lang="id">
+<head>
+{head}
+</head>
+<body>
+{header}
+<main id="isi">
+  <div class="wadah">
+{isi}
+  </div>
+</main>
+{kaki()}
+{script}
+</body>
+</html>
+"""
