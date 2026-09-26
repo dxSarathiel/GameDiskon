@@ -45,6 +45,14 @@ except Exception as err:
         return ""
 
 try:
+    from afiliasi import baris_telegram
+except Exception as err:
+    print("afiliasi.py bermasalah, baris voucher di Telegram dilewati:", err)
+
+    def baris_telegram():
+        return ""
+
+try:
     from halaman_info import buat_halaman_info
 except Exception as err:
     print("halaman_info.py bermasalah, halaman Tentang/Privasi/Kontak dilewati:", err)
@@ -359,6 +367,8 @@ def susun_pesan(epic, steam):
     situs = url_situs()
     if TAMPILKAN_LINK_WEB and situs:
         baris += ["", f'🌐 <a href="{situs}">Lihat semua diskon hari ini di web</a>']
+    if steam and baris_telegram():
+        baris.append(baris_telegram())
     return "\n".join(baris).strip()
 
 
@@ -388,6 +398,8 @@ def susun_pesan_kosong(epic_semua, steam_layak):
     situs = url_situs()
     if TAMPILKAN_LINK_WEB and situs:
         baris += ["", f'🌐 <a href="{situs}">Lihat daftar lengkapnya di web</a>']
+    if baris_telegram():
+        baris.append(baris_telegram())
     baris += ["", "Radar berikutnya: besok sore. 👋"]
     return "\n".join(baris).strip()
 
