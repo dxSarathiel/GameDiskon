@@ -50,6 +50,12 @@ except Exception as err:
     print("halaman_info.py bermasalah, halaman Tentang/Privasi/Kontak dilewati:", err)
     buat_halaman_info = None
 
+try:
+    from halaman_artikel import buat_halaman_artikel
+except Exception as err:
+    print("halaman_artikel.py bermasalah, artikel panduan dilewati:", err)
+    buat_halaman_artikel = None
+
 # ---------- Pengaturan (ubah sesuai selera) ----------
 MIN_DISKON_PERSEN = 50      # diskon minimal di harga Indonesia
 MIN_RATING_STEAM = 85       # % ulasan positif minimal
@@ -484,6 +490,11 @@ def main():
             halaman_lain += buat_halaman_info(link_telegram=link_channel(), nama_channel=NAMA_CHANNEL)
         except Exception as err:
             print("Halaman info gagal dibuat:", err)
+    if BUAT_HALAMAN and buat_halaman_artikel:
+        try:
+            halaman_lain += buat_halaman_artikel(epic_semua)
+        except Exception as err:
+            print("Artikel gagal dibuat:", err)
     if BUAT_HALAMAN and buat_halaman and (epic_semua or steam_layak):
         try:
             path = buat_halaman(epic_semua, steam_layak, link_telegram=link_channel(),
