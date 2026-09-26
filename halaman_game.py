@@ -17,7 +17,7 @@ import unicodedata
 from datetime import datetime
 from html import escape
 
-from gaya import halaman_utuh, kepala, pita, tulis_css
+from gaya import USERNAME_BOT_ALARM, halaman_utuh, kepala, pita, tulis_css
 from halaman import BULAN, WIB, _rupiah, url_situs
 
 try:
@@ -27,9 +27,6 @@ except Exception as err:          # afiliasi.py bermasalah: halaman tetap dibuat
 
     def blok_halaman_game(harga_sen):
         return ""
-
-# Username bot alarm harga (tanpa @). Kosongkan kalau bot alarm belum dipasang.
-USERNAME_BOT_ALARM = ""
 
 MIN_HARI_INDEKS = 14        # halaman game boleh diindeks Google setelah datanya >= sekian hari
 BATAS_TIDAK_DIPANTAU = 3    # kalau tidak dicek selama > sekian hari, tampilkan pemberitahuan

@@ -10,7 +10,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from html import escape
 
-from gaya import halaman_utuh, kepala, pita, tulis_css
+from gaya import USERNAME_BOT_ALARM, halaman_utuh, kepala, pita, tulis_css
 
 try:
     from afiliasi import blok_beranda
@@ -310,7 +310,17 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
     tambahan = (f'<meta name="google-site-verification" content="{escape(google_verifikasi)}">'
                 if google_verifikasi else "")
     head = kepala(judul_halaman, deskripsi, kanonik=situs, og_gambar=og_gambar, tambahan=tambahan)
-    html = halaman_utuh(head, pita(link_telegram, hero=hero), bagian_epic + bagian_steam + blok_beranda() + tanya,
+    ajakan_alarm = ""
+    if USERNAME_BOT_ALARM:
+        ajakan_alarm = f"""
+    <aside class="voucher lebar alarm" aria-labelledby="h-alarm">
+      <div>
+        <h2 id="h-alarm">Menunggu harga lebih murah?</h2>
+        <p>Pasang alarm harga di Telegram. Ketik nama game, pilih target harganya, dan kamu akan dikabari saat harganya di Steam Indonesia turun sampai target itu.</p>
+      </div>
+      <a class="tombol" href="https://t.me/{escape(USERNAME_BOT_ALARM)}" rel="noopener">🔔 Pasang alarm harga</a>
+    </aside>"""
+    html = halaman_utuh(head, pita(link_telegram, hero=hero), bagian_epic + bagian_steam + ajakan_alarm + blok_beranda() + tanya,
                         script=SKRIP_BERANDA)
     with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as f:
         f.write(html)

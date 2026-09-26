@@ -369,6 +369,8 @@ def susun_pesan(epic, steam):
         baris += ["", f'🌐 <a href="{situs}">Lihat semua diskon hari ini di web</a>']
     if steam and baris_telegram():
         baris.append(baris_telegram())
+    if steam and baris_alarm():
+        baris.append(baris_alarm())
     return "\n".join(baris).strip()
 
 
@@ -400,6 +402,8 @@ def susun_pesan_kosong(epic_semua, steam_layak):
         baris += ["", f'🌐 <a href="{situs}">Lihat daftar lengkapnya di web</a>']
     if baris_telegram():
         baris.append(baris_telegram())
+    if baris_alarm():
+        baris.append(baris_alarm())
     baris += ["", "Radar berikutnya: besok sore. 👋"]
     return "\n".join(baris).strip()
 
@@ -419,6 +423,17 @@ def kirim_pesan_kosong(state, epic_semua, steam_layak, semua_sumber_gagal):
     if kirim_telegram(susun_pesan_kosong(epic_semua, steam_layak)):
         state[kunci] = datetime.now(timezone.utc).isoformat()
         simpan_state(state)
+
+
+def baris_alarm():
+    """Ajakan memasang alarm harga di bot Telegram (kosong kalau username bot belum diisi)."""
+    try:
+        from gaya import USERNAME_BOT_ALARM
+    except Exception:
+        return ""
+    if not USERNAME_BOT_ALARM:
+        return ""
+    return f'🔔 Tunggu harga lebih murah? Pasang alarm di @{USERNAME_BOT_ALARM}'
 
 
 def panjang_terlihat(teks_html):

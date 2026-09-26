@@ -11,6 +11,9 @@ import json
 import os
 from html import escape
 
+# Username bot alarm harga (tanpa @). Kosongkan untuk menyembunyikan semua ajakan alarm.
+USERNAME_BOT_ALARM = "DiskonGame_bot"
+
 LINK_TELEGRAM = ""   # diisi radar_diskon.py saat berjalan, supaya tombol Telegram muncul di semua halaman
 
 FONT_URL = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap"
@@ -155,6 +158,7 @@ h3 { font-size: 1.35rem; }
 .voucher.lebar { max-width: none; display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: center; justify-content: space-between; }
 .voucher.lebar > div { flex: 1 1 28rem; }
 .voucher.lebar .tombol { margin: 0; }
+.voucher.alarm { border-left-color: var(--biru); }
 
 /* ---------- Tanya jawab ---------- */
 .tanya { max-width: 62ch; border-top: 2px solid var(--tinta); }
