@@ -14,16 +14,13 @@ BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
 MAKS_ITEM_HALAMAN = 60
 
 
+# Alamat situs utama. Dipakai untuk tautan kanonik, sitemap, dan link di postingan Telegram.
+ALAMAT_SITUS = "https://gamediskon.my.id/"
+
+
 def url_situs():
-    """Alamat GitHub Pages, ditebak dari nama repo yang sedang menjalankan workflow."""
-    repo = os.getenv("GITHUB_REPOSITORY", "")          # contoh: "sarathiel/radar-diskon"
-    if "/" not in repo:
-        return ""
-    pemilik, nama = repo.split("/", 1)
-    pemilik = pemilik.lower()
-    if nama.lower() == f"{pemilik}.github.io":
-        return f"https://{pemilik}.github.io/"
-    return f"https://{pemilik}.github.io/{nama}/"
+    """Alamat situs utama (domain sendiri di hosting Rumahweb)."""
+    return ALAMAT_SITUS
 
 
 def _rupiah(sen):
