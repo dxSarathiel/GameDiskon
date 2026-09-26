@@ -125,13 +125,13 @@ def _html_artikel(a, situs, epic_semua):
              f'<li><a href="/panduan/">Panduan</a></li>'
              f'<li aria-current="page">{escape(a["judul"])}</li></ol></nav>')
     badan = f"""{jejak}
-    <main class="prosa">
+    <div class="prosa">
       <article>
-        <h1>{escape(a['judul'])}</h1>
+        <h1 class="judul-halaman">{escape(a['judul'])}</h1>
         <p class="meta">{meta}.</p>
 {_ke_html(a['isi'], epic_semua)}
       </article>
-    </main>"""
+    </div>"""
     jsonld = {
         "@context": "https://schema.org", "@type": "Article",
         "headline": a["judul"], "description": a["deskripsi"],
@@ -140,7 +140,7 @@ def _html_artikel(a, situs, epic_semua):
         "publisher": {"@type": "Organization", "name": "GameDiskon", "url": situs},
         "mainEntityOfPage": url, "inLanguage": "id",
     }
-    return url, _kerangka(a["judul"], a["deskripsi"], url, badan, jsonld=jsonld, css_tambahan=CSS_ARTIKEL)
+    return url, _kerangka(a["judul"], a["deskripsi"], url, badan, jsonld=jsonld, aktif="panduan")
 
 
 def _html_daftar(daftar, situs):
@@ -148,13 +148,13 @@ def _html_daftar(daftar, situs):
     item = "".join(f'<li><h2><a href="/panduan/{a["slug"]}/">{escape(a["judul"])}</a></h2>'
                    f'<p>{escape(a["deskripsi"])}</p></li>' for a in daftar)
     badan = f"""{_jejak_sederhana(situs, "Panduan")}
-    <main>
-      <h1>Panduan berburu game murah</h1>
+    <div>
+      <h1 class="judul-halaman">Panduan berburu game murah</h1>
       <p class="catatan">Cara mendapatkan game gratis dan harga termurah di Steam dan Epic Games Store, khusus untuk pemain di Indonesia.</p>
       <ul class="daftar-artikel">{item}</ul>
-    </main>"""
+    </div>"""
     deskripsi = "Panduan mendapatkan game gratis dan diskon termurah di Steam dan Epic Games Store untuk pemain di Indonesia."
-    return url, _kerangka("Panduan Berburu Game Murah dan Gratis", deskripsi, url, badan, css_tambahan=CSS_ARTIKEL)
+    return url, _kerangka("Panduan Berburu Game Murah dan Gratis", deskripsi, url, badan, aktif="panduan")
 
 
 def buat_halaman_artikel(epic_semua=None, folder="docs", folder_artikel=FOLDER_ARTIKEL):
