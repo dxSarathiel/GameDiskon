@@ -1,20 +1,24 @@
 """
-Radar Diskon Game — v2 (dengan pencatatan riwayat harga Rupiah)
+Radar Diskon Game — v3 (riwayat harga Rupiah + gambar ringkasan)
 Sumber data (semua gratis, tanpa API key):
   1. CheapShark  -> daftar kandidat diskon Steam yang ratingnya bagus
   2. Steam       -> cek harga ASLI di region Indonesia (Rupiah)
   3. Epic Games  -> game yang sedang gratis
 Setiap hari, harga Rupiah semua game yang dipantau dicatat ke harga_idr.json.
+Setiap posting disertai gambar ringkasan (dibuat oleh gambar.py).
 Hasil dikirim ke channel Telegram. Kalau token belum diisi, hanya dicetak (dry run).
 """
 
 import json
 import os
+import re
 import time
 from datetime import datetime, timedelta, timezone
-from html import escape
+from html import escape, unescape
 
 import requests
+
+from gambar import buat_gambar
 
 # ---------- Pengaturan (ubah sesuai selera) ----------
 MIN_DISKON_PERSEN = 50      # diskon minimal di harga Indonesia
@@ -27,9 +31,13 @@ HALAMAN_CHEAPSHARK = 2      # 2 halaman x 60 = sampai 120 kandidat per hari
 MAKS_GAME_DIPANTAU = 2000   # batas jumlah game yang harganya dicatat tiap hari
 MIN_HARI_DATA = 30          # label "terendah" baru muncul setelah data game >= sekian hari
 
-USER_AGENT = "RadarDiskonGameID/0.2 (github.com/dxSarathiel/GameDiskon)"  # ganti USERNAME
+NAMA_CHANNEL = "Kumpulan Game Diskon"  # tampil di bagian atas gambar
+KIRIM_GAMBAR = True                     # ubah ke False untuk kembali ke teks saja
+
+USER_AGENT = "RadarDiskonGameID/0.3 (github.com/dxSarathiel/GameDiskon)"  # ganti USERNAME
 STATE_FILE = "sent.json"
 RIWAYAT_FILE = "harga_idr.json"
+GAMBAR_FILE = "radar.jpg"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
@@ -182,6 +190,7 @@ def proses_steam(state, riwayat):
             "rating": f"{int(d['steamRatingPercent'])}%",
             "terendah_sejak": label.get(appid),
             "url": f"https://store.steampowered.com/app/{appid}/",
+            "gambar": f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg",
         })
 
     # Yang harganya terendah tercatat didahulukan, lalu yang diskonnya terbesar
@@ -209,11 +218,13 @@ def ambil_gratis_epic(state):
         slug = next((m["pageSlug"] for m in (e.get("offerMappings") or []) if m.get("pageSlug")),
                     e.get("productSlug"))
         berakhir = datetime.fromisoformat(tawaran["endDate"].replace("Z", "+00:00")).astimezone(WIB)
+        gambar = {k["type"]: k["url"] for k in (e.get("keyImages") or [])}
         hasil.append({
             "kunci": kunci,
             "judul": e["title"],
             "berakhir": berakhir.strftime("%d/%m %H:%M WIB"),
             "url": f"https://store.epicgames.com/p/{slug}" if slug else "https://store.epicgames.com/free-games",
+            "gambar": gambar.get("OfferImageWide") or gambar.get("Thumbnail") or next(iter(gambar.values()), ""),
         })
     return hasil
 
@@ -243,20 +254,48 @@ def susun_pesan(epic, steam):
     return "\n".join(baris).strip()
 
 
-def kirim_telegram(teks):
+def panjang_terlihat(teks_html):
+    # Batas caption Telegram dihitung dari teks yang terlihat, bukan tag HTML-nya
+    return len(unescape(re.sub(r"<[^>]+>", "", teks_html)))
+
+
+def link_channel():
+    return f"t.me/{TELEGRAM_CHAT_ID[1:]}" if TELEGRAM_CHAT_ID.startswith("@") else ""
+
+
+def _telegram(metode, data, files=None):
+    r = requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{metode}",
+                      data=data, files=files, timeout=60)
+    if not r.ok:
+        print(f"{metode} gagal:", r.text)
+    return r.ok
+
+
+def kirim_telegram(teks, path_gambar=None):
     if not (TELEGRAM_TOKEN and TELEGRAM_CHAT_ID):
         print("[DRY RUN] Token/chat ID belum diisi. Pesan yang akan dikirim:\n")
         print(teks)
+        if path_gambar:
+            print(f"\n[DRY RUN] Gambar disimpan di {path_gambar} "
+                  f"(panjang caption {panjang_terlihat(teks)} karakter)")
         return True
-    r = requests.post(
-        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-        data={"chat_id": TELEGRAM_CHAT_ID, "text": teks, "parse_mode": "HTML",
-              "disable_web_page_preview": "true"},
-        timeout=30,
-    )
-    if not r.ok:
-        print("Gagal kirim:", r.text)
-    return r.ok
+
+    dasar = {"chat_id": TELEGRAM_CHAT_ID, "parse_mode": "HTML"}
+
+    if path_gambar:
+        with open(path_gambar, "rb") as foto:
+            if panjang_terlihat(teks) <= 1024:
+                # Muat dalam satu posting: gambar + teks sebagai caption
+                if _telegram("sendPhoto", dict(dasar, caption=teks), {"photo": foto}):
+                    return True
+            else:
+                # Terlalu panjang untuk caption: kirim gambar dulu, teks menyusul
+                _telegram("sendPhoto", dict(dasar, caption="🔥 Sorotan hari ini — detail di bawah 👇"),
+                          {"photo": foto})
+        print("Lanjut kirim teks.")
+
+    # Teks selalu dikirim kalau gambar tidak ada, gagal, atau caption kepanjangan
+    return _telegram("sendMessage", dict(dasar, text=teks, disable_web_page_preview="true"))
 
 
 def main():
@@ -282,7 +321,15 @@ def main():
         print("Tidak ada deal baru hari ini.")
         return
 
-    if kirim_telegram(susun_pesan(epic, steam)):
+    path_gambar = None
+    if KIRIM_GAMBAR:
+        try:
+            path_gambar = buat_gambar(epic, steam, GAMBAR_FILE, session,
+                                      NAMA_CHANNEL, link_channel())
+        except Exception as err:
+            print("Gambar gagal dibuat, kirim teks saja:", err)
+
+    if kirim_telegram(susun_pesan(epic, steam), path_gambar):
         sekarang = datetime.now(timezone.utc).isoformat()
         for g in epic + steam:
             state[g["kunci"]] = sekarang
