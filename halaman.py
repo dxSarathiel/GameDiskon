@@ -310,6 +310,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
     <footer>
       <ul class="tautan-kaki">
         <li><a href="/game/">Semua game</a></li>
+        <li><a href="/panduan/">Panduan</a></li>
         <li><a href="/tentang/">Tentang</a></li>
         <li><a href="/kebijakan-privasi/">Kebijakan Privasi</a></li>
         <li><a href="/kontak/">Kontak</a></li>
