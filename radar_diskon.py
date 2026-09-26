@@ -6,7 +6,8 @@ Sumber data (semua gratis, tanpa API key):
   3. Epic Games  -> game yang sedang gratis
 Setiap hari, harga Rupiah semua game yang dipantau dicatat ke harga_idr.json.
 Setiap posting disertai gambar ringkasan (dibuat oleh gambar.py).
-Setiap hari halaman web docs/index.html diperbarui untuk GitHub Pages (halaman.py).
+Setiap hari halaman web docs/index.html diperbarui dan di-upload ke gamediskon.my.id (halaman.py).
+Di hari tanpa deal baru, dikirim pesan singkat berisi yang masih berlaku (maksimal sekali sehari).
 Hasil dikirim ke channel Telegram. Kalau token belum diisi, hanya dicetak (dry run).
 """
 
@@ -43,6 +44,8 @@ MIN_HARI_DATA = 30          # label "terendah" baru muncul setelah data game >= 
 
 NAMA_CHANNEL = "Kumpulan Game Diskon"  # tampil di bagian atas gambar
 KIRIM_GAMBAR = True                     # ubah ke False untuk kembali ke teks saja
+KIRIM_PESAN_KOSONG = True               # tetap kirim pesan singkat di hari tanpa deal baru
+MAKS_PENGINGAT_EPIC = 3                 # jumlah game gratis Epic yang diingatkan di pesan itu
 BUAT_HALAMAN = True                     # halaman web harian untuk GitHub Pages (folder docs)
 TAMPILKAN_LINK_WEB = True              # ubah ke True SETELAH GitHub Pages aktif
 GOOGLE_VERIFIKASI = "NeGuLjS_j7yta3znaeJWo-JRiksuR9yDI_F7atB-RqU" # isi kode dari Google Search Console (opsional)
@@ -329,6 +332,53 @@ def susun_pesan(epic, steam):
     return "\n".join(baris).strip()
 
 
+def susun_pesan_kosong(epic_semua, steam_layak):
+    """Pesan singkat untuk hari tanpa deal BARU: rangkuman yang masih berlaku + link web."""
+    baris = [f"🎮 <b>Radar Diskon Game</b> — {datetime.now(WIB):%d/%m/%Y}"]
+    ev = event_hari_ini()
+    if ev and ev["status"] == "berlangsung":
+        baris.append(f'{ev["emoji"]} <b>{escape(ev["nama"])}</b> sedang berlangsung ({ev["periode"]})')
+    elif ev:
+        baris.append(f'⏳ {escape(ev["nama"])} dimulai {ev["mulai_teks"]}')
+    baris += ["", "📭 Belum ada diskon atau game gratis <b>baru</b> hari ini."]
+
+    masih = []
+    if steam_layak:
+        masih.append(f"{len(steam_layak)} diskon Steam (harga Indonesia)")
+    if epic_semua:
+        masih.append(f"{len(epic_semua)} game gratis Epic")
+    if masih:
+        baris.append("Yang masih berlaku: " + " dan ".join(masih) + ".")
+
+    if epic_semua:
+        baris += ["", "🆓 <b>Masih bisa diklaim gratis:</b>"]
+        for g in epic_semua[:MAKS_PENGINGAT_EPIC]:
+            baris.append(f'• <a href="{g["url"]}">{escape(g["judul"])}</a> — sampai {g["berakhir"]}')
+
+    situs = url_situs()
+    if TAMPILKAN_LINK_WEB and situs:
+        baris += ["", f'🌐 <a href="{situs}">Lihat daftar lengkapnya di web</a>']
+    baris += ["", "Radar berikutnya: besok sore. 👋"]
+    return "\n".join(baris).strip()
+
+
+def kirim_pesan_kosong(state, epic_semua, steam_layak, semua_sumber_gagal):
+    """Kirim paling banyak SEKALI per hari, walaupun workflow dijalankan berkali-kali."""
+    if not KIRIM_PESAN_KOSONG:
+        return
+    if semua_sumber_gagal:
+        # Jangan bilang "tidak ada diskon" kalau sebenarnya datanya gagal diambil
+        print("Semua sumber gagal, pesan hari kosong tidak dikirim.")
+        return
+    kunci = f"pesan-kosong:{HARI_INI}"
+    if kunci in state:
+        print("Pesan hari kosong sudah dikirim hari ini, dilewati.")
+        return
+    if kirim_telegram(susun_pesan_kosong(epic_semua, steam_layak)):
+        state[kunci] = datetime.now(timezone.utc).isoformat()
+        simpan_state(state)
+
+
 def panjang_terlihat(teks_html):
     # Batas caption Telegram dihitung dari teks yang terlihat, bukan tag HTML-nya
     return len(unescape(re.sub(r"<[^>]+>", "", teks_html)))
@@ -383,9 +433,13 @@ def main():
     except Exception as err:
         print("Epic gagal:", err)
         epic_semua = []
+        epic_gagal = True
+    else:
+        epic_gagal = False
     epic = [g for g in epic_semua if g["kunci"] not in state]
 
     steam, steam_layak = [], []
+    steam_gagal = False
     try:
         steam, steam_layak, jumlah_dicek = proses_steam(state, riwayat)
         # Riwayat disimpan SETIAP hari, walaupun tidak ada yang diposting
@@ -393,6 +447,7 @@ def main():
         print(f"Harga dicatat: {jumlah_dicek} game dicek, total {len(riwayat)} game dipantau.")
     except Exception as err:
         print("Steam/CheapShark gagal:", err)
+        steam_gagal = True
 
     # Halaman web juga diperbarui setiap hari, termasuk hari tanpa posting baru
     if BUAT_HALAMAN and buat_halaman and (epic_semua or steam_layak):
@@ -406,6 +461,7 @@ def main():
 
     if not epic and not steam:
         print("Tidak ada deal baru hari ini.")
+        kirim_pesan_kosong(state, epic_semua, steam_layak, epic_gagal and steam_gagal)
         return
 
     path_gambar = None
