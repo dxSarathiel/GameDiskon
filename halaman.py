@@ -1,5 +1,5 @@
 """
-Membuat halaman web statis (docs/index.html, sitemap.xml, robots.txt)
+Membuat halaman web statis (docs/index.html, sitemap.xml, robots.txt, .htaccess)
 yang di-upload ke hosting gamediskon.my.id.
 Halaman menampilkan SEMUA diskon yang layak hari ini (bukan hanya yang baru
 diposting), jadi selalu lengkap walaupun channel hari itu hanya memposting sedikit.
@@ -17,11 +17,46 @@ MAKS_ITEM_HALAMAN = 60
 
 # Alamat situs utama. Dipakai untuk tautan kanonik, sitemap, dan link di postingan Telegram.
 ALAMAT_SITUS = "https://gamediskon.my.id/"
+# .htaccess: pengalihan http/www ke alamat utama. Ubah ke False kalau hosting bermasalah.
+BUAT_HTACCESS = True
 
 
 def url_situs():
     """Alamat situs utama (domain sendiri di hosting Rumahweb)."""
     return ALAMAT_SITUS
+
+
+def _tulis_htaccess(folder, situs):
+    """Pengaturan server Apache di hosting: alihkan http:// dan www ke alamat utama,
+    dan sembunyikan daftar isi folder. Hanya dibuat kalau alamat situs memakai https."""
+    if not BUAT_HTACCESS or not situs.startswith("https://"):
+        return
+    host = situs[len("https://"):].strip("/")
+    host_regex = host.replace(".", "\\.")
+    isi = f"""# Dibuat otomatis oleh halaman.py setiap hari. Perubahan manual akan tertimpa.
+
+# Jangan tampilkan daftar isi folder kepada pengunjung
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Pemeriksaan sertifikat HTTPS (AutoSSL) jangan dialihkan
+RewriteRule ^\\.well-known/ - [L]
+
+# www.{host} -> {host}
+RewriteCond %{{HTTP_HOST}} !^{host_regex}$ [NC]
+RewriteCond %{{HTTP_HOST}} ^www\\. [NC]
+RewriteRule ^ https://{host}%{{REQUEST_URI}} [L,R=301]
+
+# http:// -> https://
+RewriteCond %{{HTTPS}} !=on
+RewriteCond %{{HTTP:X-Forwarded-Proto}} !=https
+RewriteRule ^ https://{host}%{{REQUEST_URI}} [L,R=301]
+</IfModule>
+"""
+    with open(os.path.join(folder, ".htaccess"), "w", encoding="utf-8") as f:
+        f.write(isi)
 
 
 def _rupiah(sen):
@@ -286,5 +321,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
         # robots.txt: izinkan semua mesin pencari dan tunjukkan lokasi sitemap
         with open(os.path.join(folder, "robots.txt"), "w", encoding="utf-8") as f:
             f.write(f"User-agent: *\nAllow: /\n\nSitemap: {situs}sitemap.xml\n")
+        # .htaccess: satukan semua alamat (http, www) ke alamat utama situs
+        _tulis_htaccess(folder, situs)
 
     return os.path.join(folder, "index.html")
