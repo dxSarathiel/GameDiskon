@@ -12,6 +12,14 @@ from html import escape
 
 from gaya import halaman_utuh, kepala, pita, tulis_css
 
+try:
+    from afiliasi import blok_beranda
+except Exception as err:          # afiliasi.py bermasalah: beranda tetap dibuat tanpa ajakan voucher
+    print("afiliasi.py bermasalah, ajakan voucher dilewati:", err)
+
+    def blok_beranda():
+        return ""
+
 WIB = timezone(timedelta(hours=7))
 BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
          "Agustus", "September", "Oktober", "November", "Desember"]
@@ -302,7 +310,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
     tambahan = (f'<meta name="google-site-verification" content="{escape(google_verifikasi)}">'
                 if google_verifikasi else "")
     head = kepala(judul_halaman, deskripsi, kanonik=situs, og_gambar=og_gambar, tambahan=tambahan)
-    html = halaman_utuh(head, pita(link_telegram, hero=hero), bagian_epic + bagian_steam + tanya,
+    html = halaman_utuh(head, pita(link_telegram, hero=hero), bagian_epic + bagian_steam + blok_beranda() + tanya,
                         script=SKRIP_BERANDA)
     with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as f:
         f.write(html)
