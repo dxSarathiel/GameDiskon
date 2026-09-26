@@ -63,7 +63,10 @@ def _kebijakan(situs):
       <p>Berlaku sejak {_tgl(TANGGAL_BERLAKU)}. Halaman ini menjelaskan data apa yang terlibat saat kamu mengunjungi {escape(situs)} dan bagaimana data itu digunakan.</p>
 
       <h2>Data yang kami kumpulkan</h2>
-      <p>Situs ini tidak memiliki akun, formulir pendaftaran, atau kolom komentar, dan tidak meminta data pribadi apa pun darimu. Situs ini juga tidak memasang cookie dan tidak memakai alat pelacak atau statistik pengunjung.</p>
+      <p>Situs ini tidak memiliki akun, formulir pendaftaran, atau kolom komentar, dan tidak meminta data pribadi apa pun darimu. Situs ini juga tidak memasang cookie dan tidak memakai alat pelacak atau statistik pengunjung. Satu-satunya data yang kami simpan berasal dari fitur alarm harga di Telegram, yang dijelaskan di bawah.</p>
+
+      <h2>Alarm harga di Telegram</h2>
+      <p>Kalau kamu memasang alarm harga lewat bot Telegram kami, kami menyimpan ID chat Telegram-mu (angka yang diberikan Telegram, bukan nomor HP) beserta daftar game dan target harganya. Data ini disimpan di server hosting kami, hanya dipakai untuk mengirim kabar saat harga turun, dan tidak dibagikan ke siapa pun. Alarm dihapus otomatis setelah kabarnya terkirim. Kamu bisa menghapus semua alarm dan data chat-mu kapan saja dengan perintah /hapussemua, dan datanya juga terhapus kalau kamu memblokir bot.</p>
 
       <h2>Catatan server</h2>
       <p>Seperti hampir semua situs web, server penyedia hosting kami secara otomatis mencatat informasi teknis setiap kunjungan, misalnya alamat IP, jenis browser, halaman yang dibuka, dan waktunya. Catatan ini digunakan untuk menjaga keamanan dan kelancaran situs, tidak dipakai untuk mengenali pengunjung, dan tidak dijual kepada siapa pun.</p>
