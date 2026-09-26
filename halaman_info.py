@@ -128,10 +128,10 @@ def buat_halaman_info(folder="docs", link_telegram="", nama_channel=""):
     for jalur, (nama, judul, deskripsi, isi) in halaman.items():
         url = f"{situs}{jalur}/"
         badan = f"""{_jejak_sederhana(situs, nama)}
-    <main class="prosa">
-      <h1>{escape(judul)}</h1>
+    <div class="prosa">
+      <h1 class="judul-halaman">{escape(judul)}</h1>
 {isi}
-    </main>"""
+    </div>"""
         html = _kerangka(judul, deskripsi, url, badan, css_tambahan=CSS_PROSA)
         _tulis_jika_berubah(os.path.join(folder, jalur, "index.html"), html)
         hasil.append((url, TANGGAL_BERLAKU))
