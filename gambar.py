@@ -184,7 +184,7 @@ def _kartu(kanvas, draw, f, y, item, cover):
 
 
 # ---------- Fungsi utama ----------
-def buat_gambar(epic, steam, path_keluar, session, nama_channel="", link_channel=""):
+def buat_gambar(epic, steam, path_keluar, session, nama_channel="", link_channel="", label_event=""):
     """Buat JPG berisi maksimal MAKS_KARTU item: game gratis Epic dulu, lalu diskon Steam.
     Kembalikan path file, atau None kalau tidak ada item."""
     items = [dict(g, jenis="epic") for g in epic] + [dict(g, jenis="steam") for g in steam]
@@ -205,7 +205,10 @@ def buat_gambar(epic, steam, path_keluar, session, nama_channel="", link_channel
         draw.text((PAD, 62), nama_channel.upper(), font=f.sedang, fill=WARNA_AKSEN)
     draw.text((PAD, 96), "Diskon Hari Ini", font=f.besar, fill=WARNA_TEKS)
     tanggal = datetime.now(WIB).strftime("%d/%m/%Y")
-    draw.text((PAD, 182), f"{tanggal}  ·  Harga Steam Indonesia", font=f.sedang, fill=WARNA_REDUP)
+    if label_event:
+        draw.text((PAD, 182), f"{tanggal}  ·  {label_event}", font=f.sedang, fill=WARNA_AKSEN)
+    else:
+        draw.text((PAD, 182), f"{tanggal}  ·  Harga Steam Indonesia", font=f.sedang, fill=WARNA_REDUP)
 
     # Kartu
     y = header_h
