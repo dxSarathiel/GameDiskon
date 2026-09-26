@@ -148,6 +148,9 @@ CSS = """
   .daftar .harga { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
   footer { color: var(--redup); font-size: .85rem; border-top: 1px solid var(--garis); padding-top: 1.5rem; }
+  .tautan-kaki { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin: 0 0 1rem; padding: 0; }
+  .tautan-kaki a { text-underline-offset: 3px; }
+  .tautan-kaki a:hover { color: var(--teks); }
 
   @media (max-width: 40rem) {
     .utama { grid-template-columns: 1fr; }
@@ -158,7 +161,7 @@ CSS = """
 """
 
 
-def _kerangka(judul, deskripsi, kanonik, isi, og_gambar="", noindex=False, jsonld=None):
+def _kerangka(judul, deskripsi, kanonik, isi, og_gambar="", noindex=False, jsonld=None, css_tambahan=""):
     robots = '<meta name="robots" content="noindex, follow">' if noindex else ""
     data = (f'<script type="application/ld+json">{json.dumps(jsonld, ensure_ascii=False)}</script>'
             if jsonld else "")
@@ -181,19 +184,34 @@ def _kerangka(judul, deskripsi, kanonik, isi, og_gambar="", noindex=False, jsonl
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
-<style>{CSS}</style>
+<style>{CSS}{css_tambahan}</style>
 {data}
 </head>
 <body>
   <div class="wadah">
 {isi}
     <footer>
-      <p>Harga dicek setiap hari langsung ke Steam region Indonesia. Halaman ini tidak berafiliasi dengan Valve. Selalu cek halaman toko sebelum membeli.</p>
+      {TAUTAN_KAKI}
+      <p>Harga dicek setiap hari langsung ke Steam region Indonesia. Situs ini tidak berafiliasi dengan Valve maupun Epic Games. Selalu cek halaman toko sebelum membeli.</p>
     </footer>
   </div>
 </body>
 </html>
 """
+
+
+# Tautan di kaki setiap halaman (juga dipakai halaman.py untuk beranda)
+TAUTAN_KAKI = ('<ul class="tautan-kaki">'
+               '<li><a href="/game/">Semua game</a></li>'
+               '<li><a href="/tentang/">Tentang</a></li>'
+               '<li><a href="/kebijakan-privasi/">Kebijakan Privasi</a></li>'
+               '<li><a href="/kontak/">Kontak</a></li>'
+               '</ul>')
+
+
+def _jejak_sederhana(situs, nama):
+    return (f'    <nav class="jejak" aria-label="Lokasi halaman"><ol>'
+            f'<li><a href="{escape(situs)}">Beranda</a></li><li aria-current="page">{escape(nama)}</li></ol></nav>')
 
 
 def _jejak(situs, nama=None):
