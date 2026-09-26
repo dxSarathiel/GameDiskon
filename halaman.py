@@ -74,7 +74,7 @@ def _kartu_epic(g, pertama):
 
 
 def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
-                 google_verifikasi=""):
+                 google_verifikasi="", event=None):
     os.makedirs(folder, exist_ok=True)
     sekarang = datetime.now(WIB)
     situs = url_situs()
@@ -123,6 +123,19 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
       <h2 id="h-steam">Diskon Steam, harga Indonesia</h2>
       <p class="catatan">Belum ada diskon yang lolos saringan hari ini. Cek lagi besok sore.</p>
     </section>"""
+
+        # --- Penanda event sale (Autumn Sale, Winter Sale, dst.) ---
+    bagian_event = ""
+    if event:
+        if event["status"] == "berlangsung":
+            judul_halaman = f"{event['nama']}: Diskon Harian dalam Rupiah ({_tanggal_panjang(sekarang)})"
+            teks_event = (f"{event['nama']} sedang berlangsung, {event['periode']}. "
+                          f"Daftar di bawah diperbarui setiap hari dengan harga Steam Indonesia.")
+        else:
+            teks_event = (f"{event['nama']} dimulai {event['mulai_teks']}. "
+                          f"Pantau halaman ini untuk diskon harian dengan harga Rupiah asli.")
+        deskripsi = f"{teks_event} {deskripsi}"
+        bagian_event = f'\n    <p class="event">{escape(teks_event)}</p>'
 
     meta_google = (f'<meta name="google-site-verification" content="{escape(google_verifikasi)}">'
                    if google_verifikasi else "")
@@ -175,7 +188,9 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
   section {{ margin-bottom: 3.5rem; }}
   h2 {{ font-size: 1.5rem; line-height: 1.25; margin: 0; }}
   .catatan {{ color: var(--redup); margin: .25rem 0 1.25rem; max-width: 65ch; }}
-
+  .event {{ background: var(--panel); border-left: 4px solid var(--oranye); border-radius: 0 .6rem .6rem 0;
+           padding: .9rem 1.1rem; margin: -1.5rem 0 3rem; font-weight: 500; max-width: 65ch; }}
+           
   /* Game gratis: sampul besar, karena ini yang paling dicari */
   .daftar-gratis {{ list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem;
                    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }}
@@ -230,7 +245,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
       </div>
       {tombol}
     </header>
-    <main>{bagian_epic}{bagian_steam}
+    <main>{bagian_event}{bagian_epic}{bagian_steam}
     <section aria-labelledby="h-tanya">
       <h2 id="h-tanya">Pertanyaan umum</h2>
       <details>
@@ -248,10 +263,9 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
     </section>
     </main>
     <footer>
-      <p>Selamat menikmati berbagai game gratis dan membeli game diskon
-      <br><br>
-      Powered by Sarathiel
-      </p>
+      <p>Selamat menikmati berbagai game gratis dan berburu game diskon!</p>
+      <p>Harga diskon ini berasal dari Steam dan CheapShark serta game gratis berasal dari Epic Games Store. Halaman ini tidak berafiliasi dengan Valve maupun Epic Games. Link langsung menuju ke Toko Resmi </p>
+      <p> Powered by Sarathiel </p>
     </footer>
   </div>
 </body>
