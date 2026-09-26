@@ -30,5 +30,5 @@ jobs:
         run: |
           git config user.name "radar-bot"
           git config user.email "radar-bot@users.noreply.github.com"
-          for f in sent.json harga_idr.json; do if [ -f "$f" ]; then git add "$f"; fi; done
+          for f in sent.json harga_idr.json docs; do if [ -e "$f" ]; then git add "$f"; fi; done
           git diff --cached --quiet || (git commit -m "update data harian" && git push)
