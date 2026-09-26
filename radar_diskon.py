@@ -31,7 +31,7 @@ HALAMAN_CHEAPSHARK = 2      # 2 halaman x 60 = sampai 120 kandidat per hari
 MAKS_GAME_DIPANTAU = 2000   # batas jumlah game yang harganya dicatat tiap hari
 MIN_HARI_DATA = 30          # label "terendah" baru muncul setelah data game >= sekian hari
 
-NAMA_CHANNEL = "Kumpulan Game Diskon"  # tampil di bagian atas gambar
+NAMA_CHANNEL = "List Game Diskon by Sarathiel"  # tampil di bagian atas gambar
 KIRIM_GAMBAR = True                     # ubah ke False untuk kembali ke teks saja
 
 USER_AGENT = "RadarDiskonGameID/0.3 (github.com/dxSarathiel/GameDiskon)"  # ganti USERNAME
