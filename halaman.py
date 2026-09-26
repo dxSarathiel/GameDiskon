@@ -270,6 +270,9 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
   details p {{ color: var(--redup); margin: .6rem 0 0; max-width: 65ch; }}
 
   footer {{ color: var(--redup); font-size: .85rem; border-top: 1px solid var(--garis); padding-top: 1.5rem; }}
+  .tautan-kaki {{ list-style: none; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin: 0 0 1rem; padding: 0; }}
+  .tautan-kaki a {{ text-underline-offset: 3px; }}
+  .tautan-kaki a:hover {{ color: var(--teks); }}
 
   @media (max-width: 40rem) {{
     .baris {{ grid-template-columns: 7rem 1fr; }}
@@ -305,6 +308,12 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
     </section>
     </main>
     <footer>
+      <ul class="tautan-kaki">
+        <li><a href="/game/">Semua game</a></li>
+        <li><a href="/tentang/">Tentang</a></li>
+        <li><a href="/kebijakan-privasi/">Kebijakan Privasi</a></li>
+        <li><a href="/kontak/">Kontak</a></li>
+      </ul>
       <p>Selamat menikmati berbagai game gratis dan berburu game diskon!</p>
       <p>Harga diskon ini berasal dari Steam dan CheapShark serta game gratis berasal dari Epic Games Store. Halaman ini tidak berafiliasi dengan Valve maupun Epic Games. Link langsung menuju ke Toko Resmi </p>
       <p> Powered by Sarathiel </p>
