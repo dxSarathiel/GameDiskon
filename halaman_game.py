@@ -28,6 +28,9 @@ except Exception as err:          # afiliasi.py bermasalah: halaman tetap dibuat
     def blok_halaman_game(harga_sen):
         return ""
 
+# Username bot alarm harga (tanpa @). Kosongkan kalau bot alarm belum dipasang.
+USERNAME_BOT_ALARM = ""
+
 MIN_HARI_INDEKS = 14        # halaman game boleh diindeks Google setelah datanya >= sekian hari
 BATAS_TIDAK_DIPANTAU = 3    # kalau tidak dicek selama > sekian hari, tampilkan pemberitahuan
 
@@ -173,8 +176,15 @@ def _html_game(r, situs, link_telegram, hari_ini):
         baris.append(f'<tr><td>{_tgl(tgl)}</td><td class="angka">{ket}</td>'
                      f'<td class="angka"><strong>{_rupiah(harga)}</strong></td></tr>')
 
-    tombol_tg = (f'<a class="tombol kedua" href="https://{escape(link_telegram)}" rel="noopener">'
-                 f'Kabari saya lewat Telegram</a>') if link_telegram else ""
+    if USERNAME_BOT_ALARM:
+        # Membuka bot dengan game ini langsung terpilih (/start <appid>)
+        tombol_tg = (f'<a class="tombol kedua" href="https://t.me/{escape(USERNAME_BOT_ALARM)}?start={r["appid"]}" rel="noopener">'
+                     f'🔔 Pasang alarm harga</a>')
+    elif link_telegram:
+        tombol_tg = (f'<a class="tombol kedua" href="https://{escape(link_telegram)}" rel="noopener">'
+                     f'Ikuti kabar diskon di Telegram</a>')
+    else:
+        tombol_tg = ""
 
     isi = f"""{_jejak(situs, nama)}
     <h1 class="judul-halaman">Harga {escape(nama)} di Steam Indonesia</h1>{peringatan}
@@ -264,6 +274,20 @@ def _tulis_jika_berubah(path, isi):
     return True
 
 
+def _tulis_data_harga(semua, folder):
+    """docs/data/harga.json: harga terbaru semua game, dibaca bot alarm harga di hosting.
+    Isinya sama dengan yang tampil di halaman publik (tidak ada data pengguna)."""
+    data = {
+        "diperbarui": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"),
+        "kolom": ["nama", "slug", "harga", "normal", "diskon", "termurah"],
+        "game": {r["appid"]: [r["nama"], r["slug"], r["harga_kini"], r["normal"] or 0,
+                              r["diskon_kini"], r["harga_terendah"]] for r in semua},
+    }
+    os.makedirs(os.path.join(folder, "data"), exist_ok=True)
+    with open(os.path.join(folder, "data", "harga.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+
+
 def buat_halaman_game(riwayat, folder="docs", link_telegram=""):
     """Buat semua halaman game + halaman daftar.
     Kembalikan daftar (url, lastmod) halaman yang boleh diindeks, untuk sitemap."""
@@ -285,6 +309,7 @@ def buat_halaman_game(riwayat, folder="docs", link_telegram=""):
             untuk_sitemap.append((url, r["tgl_kini"]))
 
     if semua:
+        _tulis_data_harga(semua, folder)
         url, html = _html_daftar(semua, situs)
         _tulis_jika_berubah(os.path.join(folder, "game", "index.html"), html)
         terbaru = max(r["tgl_kini"] for r in semua)
