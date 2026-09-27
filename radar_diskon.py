@@ -77,6 +77,7 @@ MIN_HARI_DATA = 30          # label "terendah" baru muncul setelah data game >= 
 
 NAMA_CHANNEL = "Kumpulan Game Diskon"  # tampil di bagian atas gambar
 KIRIM_GAMBAR = True                     # ubah ke False untuk kembali ke teks saja
+BUAT_VIDEO = True                        # video vertikal harian, dikirim ke chat pribadi pemilik
 KIRIM_PESAN_KOSONG = True               # tetap kirim pesan singkat di hari tanpa deal baru
 MAKS_PENGINGAT_EPIC = 3                 # jumlah game gratis Epic yang diingatkan di pesan itu
 BUAT_HALAMAN = True                     # halaman web harian untuk GitHub Pages (folder docs)
@@ -98,6 +99,7 @@ RIWAYAT_FILE = "harga_idr.json"
 GAMBAR_FILE = "radar.jpg"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_OWNER_ID = os.getenv("TELEGRAM_OWNER_ID", "")   # chat pribadimu, tujuan video harian
 
 WIB = timezone(timedelta(hours=7))
 HARI_INI = datetime.now(WIB).strftime("%Y-%m-%d")
@@ -436,6 +438,54 @@ def baris_alarm():
     return f'🔔 Tunggu harga lebih murah? Pasang alarm di @{USERNAME_BOT_ALARM}'
 
 
+def kirim_video_harian(state, epic_semua, steam_layak):
+    """Buat video vertikal harian dan kirim ke chat pribadi pemilik (bukan ke channel).
+    Paling banyak sekali sehari. Game yang sudah masuk video 7 hari terakhir didahulukan untuk dilewati."""
+    if not BUAT_VIDEO:
+        return
+    kunci_hari = f"video-terkirim:{HARI_INI}"
+    if kunci_hari in state:
+        print("Video hari ini sudah dikirim, dilewati.")
+        return
+    try:
+        from video import buat_video
+        from gaya import USERNAME_BOT_ALARM
+    except Exception as err:
+        print("video.py bermasalah, video dilewati:", err)
+        return
+
+    batas = datetime.now(timezone.utc) - timedelta(days=7)
+    def baru_masuk_video(g):
+        t = state.get(f"video:{g['kunci']}")
+        return bool(t) and datetime.fromisoformat(t) > batas
+    segar = [g for g in steam_layak if not baru_masuk_video(g)]
+    pilihan = (segar + [g for g in steam_layak if g not in segar])[:5]
+
+    hasil = buat_video(pilihan, epic_semua, "video_harian.mp4", USERNAME_BOT_ALARM, link_channel(), session)
+    if not hasil:
+        return
+    print(f"Video dibuat: {hasil['durasi']:.1f} detik, {len(pilihan)} game.")
+    if not (TELEGRAM_TOKEN and TELEGRAM_OWNER_ID):
+        print("[DRY RUN] TELEGRAM_OWNER_ID belum diisi, video tidak dikirim.\n", hasil["naskah"])
+        return
+
+    with open(hasil["path"], "rb") as f:
+        ok = _telegram("sendVideo", {"chat_id": TELEGRAM_OWNER_ID, "caption": f"🎬 {hasil['judul']}",
+                                     "width": 1080, "height": 1920, "supports_streaming": "true"},
+                       {"video": ("gamediskon.mp4", f, "video/mp4")})
+    if not ok:
+        return
+    teks = ("<b>Naskah suara (TTS)</b>\n<pre>" + escape(hasil["naskah"]) + "</pre>\n\n"
+            "<b>Judul (YouTube Shorts)</b>\n<pre>" + escape(hasil["judul"]) + "</pre>\n\n"
+            "<b>Keterangan + tagar (TikTok / YouTube)</b>\n<pre>" + escape(hasil["keterangan"] + "\n\n" + hasil["tagar"]) + "</pre>")
+    _telegram("sendMessage", {"chat_id": TELEGRAM_OWNER_ID, "text": teks, "parse_mode": "HTML"})
+    sekarang = datetime.now(timezone.utc).isoformat()
+    state[kunci_hari] = sekarang
+    for g in pilihan:
+        state[f"video:{g['kunci']}"] = sekarang
+    simpan_state(state)
+
+
 def panjang_terlihat(teks_html):
     # Batas caption Telegram dihitung dari teks yang terlihat, bukan tag HTML-nya
     return len(unescape(re.sub(r"<[^>]+>", "", teks_html)))
@@ -536,6 +586,12 @@ def main():
             print(f"Halaman web diperbarui: {path} ({len(steam_layak)} diskon Steam, {len(epic_semua)} gratis Epic)")
         except Exception as err:
             print("Halaman web gagal dibuat:", err)
+
+    # Video harian untuk TikTok/Shorts, dikirim ke chat pribadi (tidak bergantung pada deal baru)
+    try:
+        kirim_video_harian(state, epic_semua, steam_layak)
+    except Exception as err:
+        print("Video gagal dibuat:", err)
 
     if not epic and not steam:
         print("Tidak ada deal baru hari ini.")
