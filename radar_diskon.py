@@ -69,6 +69,12 @@ except Exception as err:
     buat_halaman_info = None
 
 try:
+    from info_game import buat_info_game, kandidat_kabar, pesan_kandidat
+except Exception as err:
+    catat_masalah(f"info_game.py bermasalah, rubrik Info Game dilewati: {err}")
+    buat_info_game = None
+
+try:
     from halaman_artikel import buat_halaman_artikel
 except Exception as err:
     catat_masalah(f"halaman_artikel.py bermasalah, artikel panduan dilewati: {err}")
@@ -515,6 +521,38 @@ def kirim_video_harian(state, epic_semua, steam_layak):
     simpan_state(state)
 
 
+def umumkan_info_game(state, info_semua):
+    """Kabarkan tulisan Info Game yang baru terbit (hari ini atau kemarin) di channel, masing-masing sekali."""
+    kemarin = (datetime.now(WIB) - timedelta(days=1)).date().isoformat()
+    situs = url_situs()
+    for t in info_semua:
+        kunci = f"info:{t['slug']}"
+        if kunci in state or t["tanggal"] < kemarin or not situs:
+            continue
+        ikon = {"Laporan harga": "📊", "Game gratis": "🆓", "Kabar mingguan": "📰"}.get(t["jenis"], "📰")
+        teks = (f"{ikon} <b>{escape(t['judul'])}</b>\n\n{escape(t['deskripsi'])}\n\n"
+                f'<a href="{situs}info-game/{t["slug"]}/">Baca selengkapnya di Info Game</a>')
+        if kirim_telegram(teks):
+            state[kunci] = datetime.now(timezone.utc).isoformat()
+            simpan_state(state)
+
+
+def kirim_kandidat_kabar(state):
+    """Setiap Sabtu (WIB), kirim daftar kandidat kabar ke chat pribadi pemilik, sekali saja."""
+    sekarang = datetime.now(WIB)
+    kunci = f"kandidat:{sekarang.date().isoformat()}"
+    if sekarang.weekday() != 5 or kunci in state or not buat_info_game:
+        return
+    if not (TELEGRAM_TOKEN and TELEGRAM_OWNER_ID):
+        print("[DRY RUN] Kandidat kabar tidak dikirim (TELEGRAM_OWNER_ID kosong).")
+        return
+    teks = pesan_kandidat(kandidat_kabar(session), sekarang.date())
+    if _telegram("sendMessage", {"chat_id": TELEGRAM_OWNER_ID, "text": teks, "parse_mode": "HTML",
+                                 "disable_web_page_preview": "true"}):
+        state[kunci] = datetime.now(timezone.utc).isoformat()
+        simpan_state(state)
+
+
 def panjang_terlihat(teks_html):
     # Batas caption Telegram dihitung dari teks yang terlihat, bukan tag HTML-nya
     return len(unescape(re.sub(r"<[^>]+>", "", teks_html)))
@@ -609,6 +647,13 @@ def _main():
             halaman_lain += buat_halaman_artikel(epic_semua)
         except Exception as err:
             catat_masalah(f"Artikel gagal dibuat: {err}")
+    info_semua = []
+    if BUAT_HALAMAN and buat_info_game:
+        try:
+            info_sitemap, info_semua = buat_info_game(riwayat, session=session, catat_masalah=catat_masalah)
+            halaman_lain += info_sitemap
+        except Exception as err:
+            catat_masalah(f"Info Game gagal dibuat: {err}")
     if CHEAPSHARK_GAGAL and not steam_layak:
         # Jangan menimpa beranda kemarin dengan rak diskon yang kosong
         print("Beranda tidak diperbarui karena daftar diskon hari ini tidak tersedia.")
@@ -616,10 +661,18 @@ def _main():
         try:
             path = buat_halaman(epic_semua, steam_layak, link_telegram=link_channel(),
                                 nama_channel=NAMA_CHANNEL, google_verifikasi=GOOGLE_VERIFIKASI,
-                                event=event_hari_ini(), halaman_lain=halaman_lain)
+                                event=event_hari_ini(), halaman_lain=halaman_lain,
+                                info_terbaru=info_semua[:3])
             print(f"Halaman web diperbarui: {path} ({len(steam_layak)} diskon Steam, {len(epic_semua)} gratis Epic)")
         except Exception as err:
             catat_masalah(f"Halaman web (beranda) gagal dibuat: {err}")
+
+    # Info Game: umumkan tulisan baru di channel, dan kirim bahan kabar mingguan ke pemilik tiap Sabtu
+    try:
+        umumkan_info_game(state, info_semua)
+        kirim_kandidat_kabar(state)
+    except Exception as err:
+        catat_masalah(f"Pengumuman/kandidat Info Game gagal: {err}")
 
     # Video harian untuk TikTok/Shorts, dikirim ke chat pribadi (tidak bergantung pada deal baru)
     try:

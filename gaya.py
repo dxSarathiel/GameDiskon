@@ -522,7 +522,7 @@ def kepala(judul, deskripsi, kanonik="", og_gambar="", noindex=False, jsonld=Non
 
 def pita(link_telegram=None, aktif="", hero=""):
     """Pita biru di atas: logo, menu, tombol Telegram, dan (khusus beranda) judul besar."""
-    menu = [("/game/", "Semua game", "game"), ("/panduan/", "Panduan", "panduan")]
+    menu = [("/game/", "Semua game", "game"), ("/info-game/", "Info Game", "info-game"), ("/panduan/", "Panduan", "panduan")]
     li = "".join(f'<li><a href="{u}"{" aria-current=\"page\"" if k == aktif else ""}>{t}</a></li>'
                  for u, t, k in menu)
     if link_telegram is None:
@@ -546,6 +546,7 @@ def kaki():
   <div class="wadah">
     <ul>
       <li><a href="/game/">Semua game</a></li>
+      <li><a href="/info-game/">Info Game</a></li>
       <li><a href="/panduan/">Panduan</a></li>
       <li><a href="/tentang/">Tentang</a></li>
       <li><a href="/kebijakan-privasi/">Kebijakan Privasi</a></li>

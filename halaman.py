@@ -29,7 +29,7 @@ MAKS_ITEM_HALAMAN = 60
 # Judul dan meta deskripsi beranda (tampil di tab browser dan hasil pencarian Google).
 # Ubah di sini kalau ingin merevisinya lagi.
 JUDUL_BERANDA = "Game Diskon | Kumpulan Game Diskon & Game Gratis Update Setiap Hari"
-DESKRIPSI_BERANDA = ("Game Diskon hadirkan informasi tentang game diskon & gratis dengan harga Rupiah"
+DESKRIPSI_BERANDA = ("Game Diskon hadirkan informasi tentang game diskon & gratis dengan harga Rupiah "
                      "di Steam dan Epic Games Store. Dapatkan game-game tersebut sebelum ketinggalan.")
 
 
@@ -185,7 +185,7 @@ SKRIP_BERANDA = """<script>
 
 
 def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
-                 google_verifikasi="", event=None, halaman_lain=None):
+                 google_verifikasi="", event=None, halaman_lain=None, info_terbaru=None):
     """halaman_lain: daftar (url, lastmod) tambahan untuk sitemap, misalnya halaman game."""
     os.makedirs(folder, exist_ok=True)
     tulis_css(folder)
@@ -316,7 +316,17 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
       </div>
       <a class="tombol" href="https://t.me/{escape(USERNAME_BOT_ALARM)}" rel="noopener">🔔 Pasang alarm harga</a>
     </aside>"""
-    html = halaman_utuh(head, pita(link_telegram, hero=hero), bagian_epic + bagian_steam + ajakan_alarm + blok_beranda() + tanya,
+    bagian_info = ""
+    if info_terbaru:
+        item = "".join(f'<li><h2><a href="/info-game/{escape(t["slug"])}/">{escape(t["judul"])}</a></h2>'
+                       f'<p>{escape(t["jenis"])}. {escape(t["deskripsi"])}</p></li>' for t in info_terbaru[:3])
+        bagian_info = f"""
+    <section class="bagian" aria-labelledby="h-info">
+      <h2 id="h-info">Info Game terbaru</h2>
+      <ul class="daftar-artikel">{item}</ul>
+      <p class="catatan" style="margin-top:1rem"><a href="/info-game/">Semua Info Game</a></p>
+    </section>"""
+    html = halaman_utuh(head, pita(link_telegram, hero=hero), bagian_epic + bagian_steam + ajakan_alarm + blok_beranda() + bagian_info + tanya,
                         script=SKRIP_BERANDA)
     with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as f:
         f.write(html)
