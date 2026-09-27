@@ -89,9 +89,10 @@ def ringkas(appid, g):
 
 # ---------- Kerangka halaman (tampilan dari gaya.py) ----------
 def _kerangka(judul, deskripsi, kanonik, isi, og_gambar="", noindex=False, jsonld=None,
-              css_tambahan="", aktif="", script=""):
+              css_tambahan="", aktif="", script="", og_tipe="website"):
     """css_tambahan tidak dipakai lagi (semua gaya ada di gaya.py); dibiarkan supaya kode lama tetap jalan."""
-    head = kepala(judul, deskripsi, kanonik=kanonik, og_gambar=og_gambar, noindex=noindex, jsonld=jsonld)
+    head = kepala(judul, deskripsi, kanonik=kanonik, og_gambar=og_gambar, noindex=noindex, jsonld=jsonld,
+                  og_tipe=og_tipe)
     return halaman_utuh(head, pita(aktif=aktif), isi, script=script)
 
 
@@ -186,7 +187,7 @@ def _html_game(r, situs, link_telegram, hari_ini):
     isi = f"""{_jejak(situs, nama)}
     <h1 class="judul-halaman">Harga {escape(nama)} di Steam Indonesia</h1>{peringatan}
     <div class="produk">
-      <img src="{escape(gambar)}" alt="" width="460" height="215" fetchpriority="high" decoding="async">
+      <img src="{escape(gambar)}" alt="{escape(nama)}" width="460" height="215" fetchpriority="high" decoding="async">
       <div>
         {stiker}
         <p class="kalimat{' baik' if baik else ''}">{escape(kalimat)}</p>

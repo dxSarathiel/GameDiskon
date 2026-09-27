@@ -37,9 +37,11 @@ Syarat diskon yang tampil di rak (bisa diubah di bagian atas `radar_diskon.py`):
 | `halaman.py` | Beranda, sitemap, `robots.txt`, `.htaccess`. |
 | `halaman_game.py` | Halaman per game (riwayat harga) dan daftar semua game. |
 | `halaman_artikel.py` | Artikel panduan dari folder `artikel/`. |
+| `halaman_khusus.py` | Dua halaman tetap yang diperbarui tiap hari: `/game-gratis-epic/` dan `/jadwal-steam-sale/` (jadwal diambil dari `EVENT_SALE` di `radar_diskon.py`). |
 | `info_game.py` | Rubrik Info Game: laporan harga mingguan, game gratis Epic mendatang, dan kabar mingguan. |
 | `halaman_info.py` | Halaman Tentang, Kebijakan Privasi, Kontak. |
-| `gaya.py` | Semua tampilan situs (CSS, menu, kaki halaman, favicon). Ubah warna atau huruf di sini. |
+| `gaya.py` | Semua tampilan situs (CSS, menu, kaki halaman, favicon, `<head>`). Ubah warna atau huruf di sini. |
+| `aset/` | Huruf Archivo (.woff2, lisensi OFL) dan gambar pratinjau `og-gamediskon.png`. Disalin otomatis ke `docs/`. |
 | `afiliasi.py` | Link afiliasi voucher Steam Wallet dan saran nominal voucher. |
 | `gambar.py`, `video.py` | Gambar untuk postingan Telegram dan video vertikal harian. |
 | `artikel/` | Artikel panduan, ditulis tangan dalam Markdown. |
@@ -99,6 +101,5 @@ Tombol voucher Steam Wallet di situs pakai link afiliasi Lapakgaming. Kalau ada 
 
 - Statistik pengunjung (tanpa cookie).
 - Game yang dicari lewat bot alarm otomatis ikut dipantau.
-- Halaman khusus waktu Steam Autumn Sale.
 
 Ada saran, nemu harga yang salah, atau mau ngobrol soal kerja sama? Kirim email ke kontak@gamediskon.my.id.

@@ -80,6 +80,12 @@ except Exception as err:
     catat_masalah(f"halaman_artikel.py bermasalah, artikel panduan dilewati: {err}")
     buat_halaman_artikel = None
 
+try:
+    from halaman_khusus import buat_halaman_epic, buat_halaman_steam_sale
+except Exception as err:
+    catat_masalah(f"halaman_khusus.py bermasalah, halaman game gratis Epic & jadwal sale dilewati: {err}")
+    buat_halaman_epic = buat_halaman_steam_sale = None
+
 # ---------- Pengaturan (ubah sesuai selera) ----------
 MIN_DISKON_PERSEN = 50      # diskon minimal di harga Indonesia
 MIN_RATING_STEAM = 85       # % ulasan positif minimal
@@ -176,6 +182,19 @@ def _periode(mulai, selesai):
     return f"{mulai.day}–{selesai.day} {BULAN_ID[mulai.month - 1]} {mulai.year}"
 
 
+def _mulai_wib(tanggal_iso):
+    """Jam mulai sale dalam WIB. Steam Sale mulai pukul 10.00 waktu Pasifik, jadi di Indonesia
+    sudah masuk tanggal berikutnya: '2026-10-01' -> 'Jumat, 2 Oktober 2026 pukul 00.00 WIB'."""
+    try:
+        from zoneinfo import ZoneInfo
+        pasifik = ZoneInfo("America/Los_Angeles")
+    except Exception:
+        return ""
+    t = datetime.strptime(tanggal_iso, "%Y-%m-%d").replace(hour=10, tzinfo=pasifik).astimezone(WIB)
+    hari = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"][t.weekday()]
+    return f"{hari}, {t.day} {BULAN_ID[t.month - 1]} {t.year} pukul {t:%H.%M} WIB"
+
+
 def event_hari_ini():
     """Event yang sedang berlangsung, atau yang akan dimulai dalam HARI_PENGUMUMAN_EVENT hari.
     Kembalikan dict berisi status "berlangsung"/"segera", atau None."""
@@ -197,6 +216,7 @@ def event_hari_ini():
             "status": status,
             "periode": _periode(mulai, selesai),
             "mulai_teks": f"{mulai.day} {BULAN_ID[mulai.month - 1]} {mulai.year}",
+            "mulai_wib": _mulai_wib(ev["mulai"]),
         }
     return None
 
@@ -654,6 +674,16 @@ def _main():
             halaman_lain += info_sitemap
         except Exception as err:
             catat_masalah(f"Info Game gagal dibuat: {err}")
+    # Halaman tetap: game gratis Epic (setelah Info Game, karena memakai catatan Epic mendatang) dan jadwal sale
+    if BUAT_HALAMAN and buat_halaman_epic:
+        try:
+            halaman_lain += buat_halaman_epic(epic_semua, info_semua)
+        except Exception as err:
+            catat_masalah(f"Halaman game gratis Epic gagal dibuat: {err}")
+        try:
+            halaman_lain += buat_halaman_steam_sale(EVENT_SALE, steam_layak)
+        except Exception as err:
+            catat_masalah(f"Halaman jadwal Steam Sale gagal dibuat: {err}")
     if CHEAPSHARK_GAGAL and not steam_layak:
         # Jangan menimpa beranda kemarin dengan rak diskon yang kosong
         print("Beranda tidak diperbarui karena daftar diskon hari ini tidak tersedia.")

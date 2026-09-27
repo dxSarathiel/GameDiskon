@@ -17,9 +17,33 @@ USERNAME_BOT_ALARM = "DiskonGame_bot"
 
 LINK_TELEGRAM = ""   # diisi radar_diskon.py saat berjalan, supaya tombol Telegram muncul di semua halaman
 
-FONT_URL = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap"
+# Huruf Archivo (lisensi OFL) di-host sendiri: file .woff2 ada di folder aset/ dan disalin ke docs/fonts/.
+# Dulu diambil dari Google Fonts, tapi CSS eksternal itu menahan tampilan halaman (render-blocking)
+# dan hurufnya datang terlambat sehingga judul besar "melompat" (CLS).
+FOLDER_ASET = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aset")
+FILE_ASET = {                      # nama di aset/ -> alamat di situs
+    "archivo-latin.woff2": "fonts/archivo-latin.woff2",
+    "archivo-latin-ext.woff2": "fonts/archivo-latin-ext.woff2",
+    "og-gamediskon.png": "og-gamediskon.png",
+}
+FONT_PRELOAD = "/fonts/archivo-latin.woff2"
+
+# Gambar pratinjau bawaan (Facebook, WhatsApp, Telegram, X) untuk halaman yang tidak punya gambar sendiri
+OG_BAWAAN = "https://gamediskon.my.id/og-gamediskon.png"
 
 CSS = r"""
+/* ---------- Huruf (di-host sendiri) ---------- */
+@font-face {
+  font-family: "Archivo"; font-style: normal; font-weight: 400 900; font-stretch: 62% 125%; font-display: swap;
+  src: url(/fonts/archivo-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Archivo"; font-style: normal; font-weight: 400 900; font-stretch: 62% 125%; font-display: swap;
+  src: url(/fonts/archivo-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* ---------- Token ---------- */
 :root {
   --kertas: #ffffff;
@@ -82,6 +106,7 @@ a:hover { color: var(--biru-tua); }
 .hero p { font-size: 1.1rem; margin: 1.25rem 0 0; max-width: 48ch; color: #dfe5ff; }
 .hero .event { display: inline-block; margin-top: 1.25rem; background: var(--kuning); color: var(--tinta);
                font-weight: 700; padding: .45rem .8rem; max-width: none; }
+.hero .event a { color: var(--tinta); }
 
 /* ---------- Judul & teks umum ---------- */
 main { padding: 2.5rem 0 4rem; }
@@ -293,6 +318,7 @@ def tulis_css(folder="docs"):
         with open(path, "w", encoding="utf-8") as f:
             f.write(CSS)
     tulis_ikon(folder)
+    tulis_aset(folder)
     return "/gaya.css?v=" + hashlib.sha1(CSS.encode()).hexdigest()[:8]
 
 
@@ -478,11 +504,42 @@ def tulis_ikon(folder="docs"):
             f.write(isi)
 
 
+def tulis_aset(folder="docs"):
+    """Salin huruf dan gambar pratinjau dari aset/ ke folder situs, hanya kalau isinya berbeda."""
+    for nama, tujuan in FILE_ASET.items():
+        sumber = os.path.join(FOLDER_ASET, nama)
+        if not os.path.exists(sumber):
+            print(f"Aset {nama} tidak ditemukan di folder aset/, dilewati.")
+            continue
+        isi = open(sumber, "rb").read()
+        path = os.path.join(folder, tujuan)
+        try:
+            with open(path, "rb") as f:
+                if f.read() == isi:
+                    continue
+        except FileNotFoundError:
+            pass
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(isi)
+
+
+def gambar_epic(url, lebar=640, tinggi=360):
+    """Minta CDN Epic mengecilkan gambar. Gambar asli Epic bisa 3 MB lebih (PNG 2560 px);
+    dengan parameter ini jadi sekitar 40 KB. Alamat di luar cdn1.epicgames.com dibiarkan."""
+    if not url or not url.startswith("https://cdn1.epicgames.com/") or "?" in url:
+        return url
+    return f"{url}?resize=1&w={lebar}&h={tinggi}&quality=medium"
+
+
 HREF_CSS = "/gaya.css?v=" + hashlib.sha1(CSS.encode()).hexdigest()[:8]
 
 
-def kepala(judul, deskripsi, kanonik="", og_gambar="", noindex=False, jsonld=None, tambahan=""):
-    """Isi <head> yang sama untuk semua halaman."""
+def kepala(judul, deskripsi, kanonik="", og_gambar="", noindex=False, jsonld=None, tambahan="",
+           og_tipe="website"):
+    """Isi <head> yang sama untuk semua halaman.
+    jsonld boleh satu dict atau daftar dict (masing-masing jadi satu <script>)."""
+    og_gambar = gambar_epic(og_gambar, 1200, 675) or OG_BAWAAN
     baris = [
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
@@ -494,27 +551,27 @@ def kepala(judul, deskripsi, kanonik="", og_gambar="", noindex=False, jsonld=Non
     if noindex:
         baris.append('<meta name="robots" content="noindex, follow">')
     baris += [
-        '<meta property="og:type" content="website">',
+        f'<meta property="og:type" content="{escape(og_tipe)}">',
         '<meta property="og:site_name" content="GameDiskon">',
+        '<meta property="og:locale" content="id_ID">',
         f'<meta property="og:title" content="{escape(judul)}">',
         f'<meta property="og:description" content="{escape(deskripsi)}">',
     ]
     if kanonik:
         baris.append(f'<meta property="og:url" content="{escape(kanonik)}">')
-    if og_gambar:
-        baris.append(f'<meta property="og:image" content="{escape(og_gambar)}">')
     baris += [
+        f'<meta property="og:image" content="{escape(og_gambar)}">',
+        '<meta name="twitter:card" content="summary_large_image">',
         '<meta name="theme-color" content="#1c3faa">',
         '<link rel="icon" href="/favicon.ico" sizes="48x48">',
         '<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">',
         '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
-        '<link rel="preconnect" href="https://fonts.googleapis.com">',
-        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
-        f'<link rel="stylesheet" href="{FONT_URL}">',
+        f'<link rel="preload" href="{FONT_PRELOAD}" as="font" type="font/woff2" crossorigin>',
         f'<link rel="stylesheet" href="{HREF_CSS}">',
     ]
-    if jsonld:
-        baris.append(f'<script type="application/ld+json">{json.dumps(jsonld, ensure_ascii=False)}</script>')
+    for data in (jsonld if isinstance(jsonld, list) else [jsonld] if jsonld else []):
+        teks = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+        baris.append(f'<script type="application/ld+json">{teks}</script>')
     if tambahan:
         baris.append(tambahan)
     return "\n".join(baris)
@@ -522,7 +579,9 @@ def kepala(judul, deskripsi, kanonik="", og_gambar="", noindex=False, jsonld=Non
 
 def pita(link_telegram=None, aktif="", hero=""):
     """Pita biru di atas: logo, menu, tombol Telegram, dan (khusus beranda) judul besar."""
-    menu = [("/game/", "Semua game", "game"), ("/info-game/", "Info Game", "info-game"), ("/panduan/", "Panduan", "panduan")]
+    menu = [("/game/", "Semua game", "game"), ("/game-gratis-epic/", "Gratis Epic", "gratis-epic"),
+            ("/jadwal-steam-sale/", "Jadwal Sale", "steam-sale"),
+            ("/info-game/", "Info Game", "info-game"), ("/panduan/", "Panduan", "panduan")]
     li = "".join(f'<li><a href="{u}"{" aria-current=\"page\"" if k == aktif else ""}>{t}</a></li>'
                  for u, t, k in menu)
     if link_telegram is None:
@@ -546,6 +605,8 @@ def kaki():
   <div class="wadah">
     <ul>
       <li><a href="/game/">Semua game</a></li>
+      <li><a href="/game-gratis-epic/">Game gratis Epic</a></li>
+      <li><a href="/jadwal-steam-sale/">Jadwal Steam Sale</a></li>
       <li><a href="/info-game/">Info Game</a></li>
       <li><a href="/panduan/">Panduan</a></li>
       <li><a href="/tentang/">Tentang</a></li>

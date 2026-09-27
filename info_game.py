@@ -23,6 +23,7 @@ import requests
 
 from halaman import BULAN, WIB, _rupiah, url_situs
 from halaman_artikel import _baca, _ke_html
+from gaya import gambar_epic
 from halaman_game import _kerangka, _tulis_jika_berubah, jalur_game, ringkas
 
 FOLDER_TULISAN = "info-game"                 # tulisan pemilik (Markdown), di-commit manual
@@ -183,23 +184,28 @@ def tulisan_epic(catatan):
         nama = [g["judul"] for g in daftar]
         gabung = nama[0] if len(nama) == 1 else ", ".join(nama[:-1]) + " dan " + nama[-1]
         tgl_umum = datetime.strptime(mulai, "%Y-%m-%d")
-        judul = f"Game Gratis Epic Minggu Depan: {gabung}"
+        # Pakai tanggal, bukan "Minggu Depan": judul tetap benar walaupun tulisannya dibaca bulan depan
+        judul = f"Game Gratis Epic {tgl_umum.day} {BULAN[tgl_umum.month - 1]} {tgl_umum.year}: {gabung}"
         deskripsi = (f"Epic Games Store akan menggratiskan {gabung} mulai {tgl_umum.day} {BULAN[tgl_umum.month - 1]}. "
                      f"Jadwal klaim dalam WIB dan caranya.")
         item = []
         for g in daftar:
-            gambar = f'<img src="{escape(g["gambar"])}" alt="" loading="lazy" style="width:100%;border-radius:3px">' if g["gambar"] else ""
+            gambar = (f'<img src="{escape(gambar_epic(g["gambar"]))}" alt="{escape(g["judul"])}" width="640" height="360" '
+                      f'loading="lazy" decoding="async" style="width:100%;height:auto;border-radius:3px">'
+                      if g["gambar"] else "")
             item.append(f'<h2>{escape(g["judul"])}</h2>{gambar}<p>Gratis mulai <strong>{_waktu_wib(g["mulai"])}</strong> '
                         f'sampai <strong>{_waktu_wib(g["berakhir"])}</strong>. '
                         f'<a href="{escape(g["url"])}" rel="noopener">Halaman game di Epic</a>.</p>')
         html = (f"<p>Epic Games Store sudah mengumumkan game gratis untuk minggu berikutnya. "
                 f"Sekali klaim, game jadi milikmu selamanya.</p>" + "".join(item)
                 + '<p>Belum pernah klaim? Ikuti <a href="/panduan/cara-klaim-game-gratis-epic-games/">panduan '
-                  'cara klaim game gratis Epic</a>. Saat game ini sudah bisa diklaim, kami kabari juga di channel Telegram.</p>')
+                  'cara klaim game gratis Epic</a>. Saat game ini sudah bisa diklaim, kami kabari juga di channel Telegram. '
+                  'Daftar yang selalu terbaru ada di halaman <a href="/game-gratis-epic/">game gratis Epic minggu ini</a>.</p>')
         # Terbit pada hari bot pertama kali melihat pengumumannya
         terbit = min(g.get("dicatat") or mulai for g in daftar)
         tulisan.append({"slug": f"epic-gratis-{mulai}", "judul": judul, "deskripsi": deskripsi, "tanggal": terbit,
-                        "jenis": "Game gratis", "html": html, "otomatis": True})
+                        "jenis": "Game gratis", "html": html, "otomatis": True,
+                        "gambar": next((g["gambar"] for g in daftar if g.get("gambar")), "")})
     return tulisan
 
 
@@ -246,7 +252,10 @@ def _html_tulisan(t, situs):
                          "name": "GameDiskon" if t["otomatis"] else PENULIS},
               "publisher": {"@type": "Organization", "name": "GameDiskon", "url": situs},
               "mainEntityOfPage": url, "inLanguage": "id"}
-    return url, _kerangka(t["judul"], t["deskripsi"], url, badan, jsonld=jsonld, aktif="info-game")
+    if t.get("gambar"):
+        jsonld["image"] = gambar_epic(t["gambar"], 1200, 675)
+    return url, _kerangka(t["judul"], t["deskripsi"], url, badan, jsonld=jsonld, aktif="info-game",
+                          og_gambar=t.get("gambar", ""), og_tipe="article")
 
 
 def _html_daftar(daftar, situs):

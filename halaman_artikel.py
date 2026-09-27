@@ -140,7 +140,7 @@ def _html_artikel(a, situs, epic_semua):
         "publisher": {"@type": "Organization", "name": "GameDiskon", "url": situs},
         "mainEntityOfPage": url, "inLanguage": "id",
     }
-    return url, _kerangka(a["judul"], a["deskripsi"], url, badan, jsonld=jsonld, aktif="panduan")
+    return url, _kerangka(a["judul"], a["deskripsi"], url, badan, jsonld=jsonld, aktif="panduan", og_tipe="article")
 
 
 def _html_daftar(daftar, situs):

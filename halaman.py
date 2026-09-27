@@ -10,7 +10,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from html import escape
 
-from gaya import USERNAME_BOT_ALARM, halaman_utuh, kepala, pita, tulis_css
+from gaya import USERNAME_BOT_ALARM, gambar_epic, halaman_utuh, kepala, pita, tulis_css
 
 try:
     from afiliasi import blok_beranda
@@ -28,10 +28,14 @@ MAKS_ITEM_HALAMAN = 60
 
 # Judul dan meta deskripsi beranda (tampil di tab browser dan hasil pencarian Google).
 # Ubah di sini kalau ingin merevisinya lagi.
-JUDUL_BERANDA = "Game Diskon | Kumpulan Game Diskon & Game Gratis Update Setiap Hari"
+# Judul di bawah 60 karakter supaya tidak terpotong di Google; kata kunci utama di depan.
+JUDUL_BERANDA = "Game Diskon Steam Hari Ini dalam Rupiah & Game Gratis Epic"
 DESKRIPSI_BERANDA = ("Game Diskon hadirkan informasi tentang game diskon & gratis dengan harga Rupiah "
                      "di Steam dan Epic Games Store. Dapatkan game-game tersebut sebelum ketinggalan.")
 
+
+# Akun resmi GameDiskon di tempat lain (untuk data terstruktur "sameAs" di beranda)
+PROFIL_SOSIAL = ["https://t.me/diskongame", "https://www.tiktok.com/@game.diskon"]
 
 # Alamat situs utama. Dipakai untuk tautan kanonik, sitemap, dan link di postingan Telegram.
 ALAMAT_SITUS = "https://gamediskon.my.id/"
@@ -55,6 +59,25 @@ def _tulis_htaccess(folder, situs):
 
 # Jangan tampilkan daftar isi folder kepada pengunjung
 Options -Indexes
+
+# Halaman "tidak ditemukan" milik situs sendiri (dibuat halaman.py)
+ErrorDocument 404 /404.html
+
+# Simpan file statis di cache browser. gaya.css aman disimpan lama karena alamatnya
+# berubah (?v=...) setiap kali tampilannya diubah. Halaman HTML tidak disimpan lama.
+<IfModule mod_expires.c>
+ExpiresActive On
+ExpiresByType text/css "access plus 1 year"
+ExpiresByType font/woff2 "access plus 1 year"
+ExpiresByType application/font-woff2 "access plus 1 year"
+ExpiresByType image/png "access plus 1 week"
+ExpiresByType image/x-icon "access plus 1 week"
+ExpiresByType image/vnd.microsoft.icon "access plus 1 week"
+ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+<IfModule mod_mime.c>
+AddType font/woff2 .woff2
+</IfModule>
 
 <IfModule mod_rewrite.c>
 RewriteEngine On
@@ -125,7 +148,7 @@ def _kartu_epic(g, pertama):
       <li>
         <a href="{escape(g['url'])}" rel="noopener">
           <span class="stempel" aria-hidden="true">GRATIS</span>
-          <img src="{escape(g['gambar'])}" alt="" width="640" height="360" {gambar_attr} decoding="async">
+          <img src="{escape(gambar_epic(g['gambar']))}" alt="" width="640" height="360" {gambar_attr} decoding="async">
           <h3>{escape(g['judul'])}</h3>
           <p class="batas">Klaim sebelum {escape(g['berakhir'])}<span class="sisa" data-berakhir="{escape(iso)}"></span></p>
         </a>
@@ -184,6 +207,39 @@ SKRIP_BERANDA = """<script>
 </script>"""
 
 
+def _jsonld_beranda(situs, deskripsi):
+    """Data terstruktur beranda: nama situs (WebSite) dan pengelolanya (Organization)."""
+    return {
+        "@context": "https://schema.org",
+        "@graph": [
+            {"@type": "WebSite", "@id": f"{situs}#situs", "name": "GameDiskon", "alternateName": "Game Diskon",
+             "url": situs, "description": deskripsi, "inLanguage": "id",
+             "publisher": {"@id": f"{situs}#pengelola"}},
+            {"@type": "Organization", "@id": f"{situs}#pengelola", "name": "GameDiskon", "url": situs,
+             "logo": f"{situs}icon-192.png", "email": "kontak@gamediskon.my.id", "sameAs": PROFIL_SOSIAL},
+        ],
+    }
+
+
+def _tulis_404(folder):
+    """docs/404.html: dipakai Apache (ErrorDocument) untuk alamat yang tidak ada."""
+    head = kepala("Halaman tidak ditemukan | GameDiskon",
+                  "Halaman yang kamu cari tidak ada atau sudah dipindah.", noindex=True)
+    isi = """
+    <div class="prosa">
+      <h1 class="judul-halaman">Halaman ini tidak ditemukan</h1>
+      <p>Alamatnya mungkin salah ketik, atau halamannya sudah dipindah. Coba mulai dari sini:</p>
+      <ul>
+        <li><a href="/">Diskon Steam hari ini</a></li>
+        <li><a href="/game-gratis-epic/">Game gratis Epic minggu ini</a></li>
+        <li><a href="/game/">Semua game yang dipantau harganya</a></li>
+        <li><a href="/jadwal-steam-sale/">Jadwal Steam Sale</a></li>
+      </ul>
+    </div>"""
+    with open(os.path.join(folder, "404.html"), "w", encoding="utf-8") as f:
+        f.write(halaman_utuh(head, pita(), isi))
+
+
 def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
                  google_verifikasi="", event=None, halaman_lain=None, info_terbaru=None):
     """halaman_lain: daftar (url, lastmod) tambahan untuk sitemap, misalnya halaman game."""
@@ -203,7 +259,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
         if event["status"] == "berlangsung":
             teks_event = f"{event['nama']} sedang berlangsung, {event['periode']}."
         else:
-            teks_event = f"{event['nama']} dimulai {event['mulai_teks']}."
+            teks_event = f"{event['nama']} dimulai {event.get('mulai_wib') or event['mulai_teks']}."
 
     # --- Judul besar di pita biru ---
     ringkas = []
@@ -213,7 +269,8 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
         ringkas.append(f"{len(epic)} game gratis di Epic")
     kalimat = (f"Dicek {HARI[sekarang.weekday()]}, {_tanggal_panjang(sekarang)} pukul {sekarang:%H.%M} WIB"
                + (f": {' dan '.join(ringkas)}." if ringkas else "."))
-    event_html = f'\n        <p class="event">{escape(teks_event)}</p>' if teks_event else ""
+    event_html = (f'\n        <p class="event"><a href="/jadwal-steam-sale/">{escape(teks_event)}</a></p>'
+                  if teks_event else "")
     unggulan = ""
     if steam:
         # Potongan paling besar hari ini (kalau sama, yang paling murah) ditempel sebagai stiker
@@ -240,7 +297,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
         bagian_epic = f"""
     <section class="bagian" aria-labelledby="h-gratis">
       <h2 id="h-gratis">Gratis di Epic Games Store</h2>
-      <p class="catatan">Klaim sebelum batas waktunya, dan game jadi milikmu selamanya. <a href="/panduan/cara-klaim-game-gratis-epic-games/">Cara klaimnya</a>.</p>
+      <p class="catatan">Klaim sebelum batas waktunya, dan game jadi milikmu selamanya. <a href="/panduan/cara-klaim-game-gratis-epic-games/">Cara klaimnya</a>, atau lihat <a href="/game-gratis-epic/">jadwal game gratis Epic minggu depan</a>.</p>
       <ul class="gratis">{kartu}
       </ul>
     </section>"""
@@ -305,7 +362,8 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
 
     tambahan = (f'<meta name="google-site-verification" content="{escape(google_verifikasi)}">'
                 if google_verifikasi else "")
-    head = kepala(judul_halaman, deskripsi, kanonik=situs, og_gambar=og_gambar, tambahan=tambahan)
+    head = kepala(judul_halaman, deskripsi, kanonik=situs, og_gambar=og_gambar, tambahan=tambahan,
+                  jsonld=_jsonld_beranda(situs, deskripsi))
     ajakan_alarm = ""
     if USERNAME_BOT_ALARM:
         ajakan_alarm = f"""
@@ -349,5 +407,6 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
             f.write(f"User-agent: *\nAllow: /\n\nSitemap: {situs}sitemap.xml\n")
         # .htaccess: satukan semua alamat (http, www) ke alamat utama situs
         _tulis_htaccess(folder, situs)
+        _tulis_404(folder)
 
     return os.path.join(folder, "index.html")
