@@ -9,6 +9,7 @@ Butuh: Pillow dan imageio-ffmpeg (ffmpeg ikut terpasang lewat pip, tidak perlu a
 """
 
 import os
+import random
 import re
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -301,34 +302,180 @@ def rakit_mp4(slide, path_mp4, folder_kerja):
 
 
 # ---------- Teks pendamping ----------
+# ---------- Naskah suara dan teks pendamping ----------
+# Naskah ditulis seperti orang ngobrol: kalimat pendek-panjang bergantian, ada reaksi,
+# pertanyaan, dan jeda (koma, titik, tanda tanya, tanda seru) supaya TTS membacanya dengan ekspresi.
+# Pilihan kalimat diacak dengan "benih" tanggal hari itu: tiap hari beda, tapi hasil hari yang sama tetap sama.
+
+KATA_PER_DETIK = 2.6        # kecepatan bicara TTS yang wajar dalam bahasa Indonesia
+
+
 def rupiah_lisan(sen):
-    """Harga untuk dibacakan TTS: 'Rp 13.999' -> '13 ribuan'."""
+    """'Rp 13.999' -> '13 ribuan', 'Rp 1.250.000' -> '1,2 jutaan'."""
     rp = sen // 100
     if rp >= 1_000_000:
-        return f"{rp / 1_000_000:.1f} jutaan".replace(".0 ", " ").replace(".", ",")
+        return f"{rp / 1_000_000:.1f}".rstrip("0").rstrip(".").replace(".", ",") + " jutaan"
     if rp >= 1000:
         return f"{rp // 1000} ribuan"
     return f"{rp} rupiah"
 
 
-def susun_teks(steam, epic, sekarang, username_bot):
-    tgl = f"{sekarang.day} {BULAN[sekarang.month - 1]}"
-    kalimat = [f"{len(steam)} diskon Steam hari ini, dengan harga Rupiah asli."]
+def hemat_lisan(sen):
+    rp = sen // 100
+    if rp >= 100_000:
+        return f"{rp // 10_000 * 10} ribu lebih"
+    return f"{rp // 1000} ribu lebih"
+
+
+def nama_lisan(judul):
+    """Nama game dipendekkan seperti orang menyebutnya: tanpa subjudul dan label edisi."""
+    n = re.sub(r"[™®©!]", "", judul)
+    n = re.split(r"\s[-–—]\s|:", n)[0]
+    n = re.sub(r"\b(Enhanced Edition|Definitive Edition|Director'?s Cut|Complete Edition|GOTY|"
+               r"Game of the Year( Edition)?|Remastered|Deluxe Edition)\b.*$", "", n, flags=re.I)
+    return n.strip() or judul
+
+
+def _hari_berakhir(g):
+    try:
+        t = datetime.fromisoformat(g["berakhir_iso"]).astimezone(WIB)
+        return HARI[t.weekday()] + (" malam" if t.hour >= 18 else "")
+    except Exception:
+        return ""
+
+
+def _banding(sen):
+    """Perbandingan harga dengan jajanan sehari-hari, hanya untuk harga yang sangat murah."""
+    rp = sen // 100
+    if rp <= 10_000:
+        return "Lebih murah dari semangkuk mie ayam."
+    if rp <= 17_000:
+        return "Masih lebih murah dari segelas kopi susu kekinian."
+    if rp <= 25_000:
+        return "Kira-kira seharga sekali makan siang."
+    return ""
+
+
+class _Pemilih:
+    """Memilih kalimat secara acak tanpa mengulang kalimat yang sudah dipakai dalam satu naskah."""
+    def __init__(self, acak):
+        self.acak, self.terpakai = acak, set()
+
+    def __call__(self, pilihan):
+        segar = [p for p in pilihan if p not in self.terpakai] or list(pilihan)
+        p = self.acak.choice(segar)
+        self.terpakai.add(p)
+        return p
+
+
+def _segmen_game(g, pilih, urutan, total, sudah_disebut, pakai_reaksi):
+    """Kalimat untuk satu slide game: inti harga, ditambah satu reaksi kalau diminta.
+    Pola kalimat (bukan kalimat jadinya) yang dicatat, supaya pola yang sama tidak terpakai dua kali."""
+    rating = int(str(g["rating"]).rstrip("%") or 0)
+    v = {"nama": nama_lisan(g["judul"]), "harga": rupiah_lisan(g["harga_akhir"]),
+         "awal": rupiah_lisan(g["harga_awal"]), "d": g["diskon"], "rating": rating,
+         "hemat": hemat_lisan(g["harga_awal"] - g["harga_akhir"])}
+
+    if sudah_disebut:
+        pola = ["Iya, beneran. Diskonnya {d} persen.", "Nggak salah lihat kok. Potongannya {d} persen."]
+    elif urutan == 1:
+        pola = ["Mulai dari {nama}. Sekarang cuma {harga}.",
+                "Pertama, {nama}... turun {d} persen, jadi {harga}!",
+                "Kita buka pakai {nama}, dari {awal} jadi {harga}."]
+    elif urutan == total:
+        pola = ["Terakhir, {nama}. Sekarang tinggal {harga}.",
+                "Dan yang terakhir... {nama}, cuma {harga}."]
+    else:
+        pola = ["{nama}, sekarang cuma {harga}.",
+                "Terus ada {nama}. Turun {d} persen, jadi {harga}.",
+                "Kalau {nama}? {harga} aja.",
+                "{nama}, dari {awal}... jadi {harga}!",
+                "Nah, {nama}. Harganya sekarang {harga}.",
+                "Ada juga {nama}, diskon {d} persen."]
+    teks = pilih(pola).format(**v)
+    if not pakai_reaksi:
+        return teks
+
+    reaksi = []
+    if g.get("terendah_sejak"):
+        reaksi += ["Ini harga paling murah sejak kami pantau.", "Belum pernah semurah ini, lho."]
+    if g["diskon"] >= 90:
+        reaksi += ["Ini sih hampir dikasih.", "Potongannya nggak main-main.", "Hematnya {hemat}!"]
+    elif g["diskon"] >= 75:
+        reaksi += ["Lumayan banget, kan?", "Pas buat yang dari dulu penasaran."]
+    if rating >= 95:
+        reaksi += ["Ulasannya {rating} persen positif. Aman.", "Yang udah main, hampir semuanya suka."]
+    banding = _banding(g["harga_akhir"])
+    if banding:
+        reaksi.append(banding)
+    return teks + (" " + pilih(reaksi).format(**v) if reaksi else "")
+
+
+def susun_teks(steam, epic, sekarang):
+    """Naskah dibagi per slide, supaya lama tiap slide bisa disesuaikan dengan panjang kalimatnya."""
+    kunci = sekarang.strftime("%Y-%m-%d") + "".join(g["kunci"] for g in steam)
+    acak = random.Random(kunci)
+    pilih = _Pemilih(acak)
+    n, g0 = len(steam), steam[0]
+    nama0, harga0 = nama_lisan(g0["judul"]), rupiah_lisan(g0["harga_akhir"])
+
+    pembuka, sebut_g0 = acak.choice([
+        (f"Stop dulu scroll-nya. {nama0} lagi {harga0} di Steam!", True),
+        (f"{harga0} dapet {nama0}? Hari ini bisa.", True),
+        (f"Dompet aman hari ini. Ada {n} game Steam yang lagi jatuh harga.", False),
+        (f"Yang nungguin diskon, ini dia. {n} game Steam, harga Rupiah asli.", False),
+        (f"Hari ini Steam lagi baik banget. Ada {n} game yang turun jauh.", False),
+        (f"Kalau lagi cari game murah, pas banget. Ini {n} yang paling worth it hari ini.", False),
+    ])
+    segmen = {"pembuka": pembuka, "game": [], "gratis": "", "penutup": ""}
+
+    # Reaksi hanya untuk 2-3 game, supaya tidak monoton dan tidak kepanjangan
+    dapat_reaksi = set(acak.sample(range(n), k=min(n, 2 if epic else 3)))
     for i, g in enumerate(steam, 1):
-        kalimat.append(f"Nomor {i}, {g['judul']}. Diskon {g['diskon']} persen, jadi {rupiah_lisan(g['harga_akhir'])} saja.")
-    for g in epic[:1]:
-        kalimat.append(f"Bonus, {g['judul']} lagi gratis di Epic Games Store. Klaim sebelum batas waktunya.")
-    kalimat.append("Daftar lengkap dan riwayat harganya ada di gamediskon titik my titik id."
-                   + (" Mau dikabari kalau harganya turun? Pasang alarm di bot Telegram kami." if username_bot else ""))
-    termurah = min(g["harga_akhir"] for g in steam)
-    judul = f"{len(steam)} Diskon Steam Hari Ini ({tgl}): Mulai {rupiah_lisan(termurah).replace('ribuan', 'Ribuan')}!"
-    keterangan = (f"{len(steam)} diskon Steam hari ini dalam Rupiah asli 🔥 "
-                  + ", ".join(f"{g['judul']} -{g['diskon']}%" for g in steam[:3])
-                  + (f". Gratis di Epic: {epic[0]['judul']}." if epic else ".")
-                  + " Daftar lengkap + riwayat harga: gamediskon.my.id"
-                  + (f" | Alarm harga: @{username_bot}" if username_bot else ""))
+        segmen["game"].append(_segmen_game(g, pilih, i, n, i == 1 and sebut_g0, (i - 1) in dapat_reaksi))
+
+    if epic:
+        g = epic[0]
+        hari = _hari_berakhir(g)
+        batas = f"sampai {hari}" if hari else "minggu ini"
+        segmen["gratis"] = pilih([
+            "Oh iya, hampir lupa. {nama} lagi gratis di Epic, {batas}. Klaim aja dulu, mainnya belakangan.",
+            "Bonus buat kamu: {nama} gratis di Epic, {batas}. Gratis beneran, bukan trial.",
+        ]).format(nama=nama_lisan(g["judul"]), batas=batas)
+    segmen["penutup"] = pilih([
+        "Daftar lengkapnya ada di gamediskon titik my titik id. Mau nunggu lebih murah lagi? Pasang alarm di bot Telegram kami.",
+        "Semuanya, lengkap sama riwayat harganya, ada di gamediskon titik my titik id. Gas, sebelum diskonnya habis!",
+        "Cek sisanya di gamediskon titik my titik id. Kalau belum cocok harganya, pasang alarm aja, nanti dikabari.",
+    ])
+    return segmen, acak
+
+
+def susun_pendamping(steam, epic, sekarang, username_bot, acak):
+    """Judul untuk Shorts, keterangan, dan tagar."""
+    tgl = f"{sekarang.day} {BULAN[sekarang.month - 1]}"
+    n, g0 = len(steam), steam[0]
+    nama0, harga0 = nama_lisan(g0["judul"]), rupiah_lisan(g0["harga_akhir"]).replace("ribuan", "Ribuan")
+    judul = acak.choice([
+        f"{nama0} Cuma {harga0}?! {n} Diskon Steam Hari Ini",
+        f"Diskon Steam {g0['diskon']}%: {nama0} Jadi {harga0} ({tgl})",
+        f"{n} Game Steam Lagi Murah Banget Hari Ini ({tgl})",
+    ])
+    buka = acak.choice([
+        "Diskon Steam hari ini, harga Rupiah asli (bukan konversi dolar).",
+        "Yang lagi murah di Steam Indonesia hari ini 👇",
+        f"Harga Steam Indonesia {tgl}, ini yang paling worth it.",
+    ])
+    daftar = "\n".join(f"• {g['judul']}: {_rupiah(g['harga_akhir'])} (-{g['diskon']}%)" for g in steam)
+    gratis = f"\n🆓 Gratis di Epic: {epic[0]['judul']}" if epic else ""
+    keterangan = (f"{buka}\n\n{daftar}{gratis}\n\nDaftar lengkap + riwayat harga: gamediskon.my.id"
+                  + (f"\nAlarm harga: @{username_bot}" if username_bot else ""))
     tagar = "#diskonsteam #steamsale #gamepc #gamemurah #infogame #steamindonesia" + (" #epicgames #gamegratis" if epic else "")
-    return {"naskah": " ".join(kalimat), "judul": judul, "keterangan": keterangan, "tagar": tagar}
+    return judul, keterangan, tagar
+
+
+def _lama(teks, minimal, maksimal):
+    """Lama slide = waktu membaca kalimatnya + jeda napas, dibatasi."""
+    return max(minimal, min(maksimal, len(teks.split()) / KATA_PER_DETIK + 0.6))
 
 
 def buat_video(steam, epic, path_mp4="video_harian.mp4", username_bot="", link_channel="", session=None):
@@ -340,13 +487,19 @@ def buat_video(steam, epic, path_mp4="video_harian.mp4", username_bot="", link_c
         return None
     _siapkan_font()
     sekarang = datetime.now(WIB)
-    slide = [(slide_pembuka(len(steam), sekarang, bool(epic)), DURASI["pembuka"])]
-    for i, g in enumerate(steam, 1):
-        slide.append((slide_game(g, i, len(steam), session), DURASI["game"]))
-    for g in epic[:1]:
-        slide.append((slide_gratis(g, session), DURASI["gratis"]))
-    slide.append((slide_penutup(username_bot, link_channel), DURASI["penutup"]))
+    segmen, acak = susun_teks(steam, epic, sekarang)
+
+    # Lama tiap slide mengikuti panjang kalimatnya, supaya suara TTS pas dengan gambar
+    slide = [(slide_pembuka(len(steam), sekarang, bool(epic)), _lama(segmen["pembuka"], 2.4, 4.5))]
+    for i, (g, teks) in enumerate(zip(steam, segmen["game"]), 1):
+        slide.append((slide_game(g, i, len(steam), session), _lama(teks, 2.6, 6.0)))
+    if epic:
+        slide.append((slide_gratis(epic[0], session), _lama(segmen["gratis"], 3.0, 6.5)))
+    slide.append((slide_penutup(username_bot, link_channel), _lama(segmen["penutup"], 3.4, 7.0)))
     durasi = rakit_mp4(slide, path_mp4, "video_kerja")
-    hasil = susun_teks(steam, epic, sekarang, username_bot)
-    hasil.update(path=path_mp4, durasi=durasi)
+
+    urutan = [segmen["pembuka"], *segmen["game"]] + ([segmen["gratis"]] if epic else []) + [segmen["penutup"]]
+    judul, keterangan, tagar = susun_pendamping(steam, epic, sekarang, username_bot, acak)
+    hasil = {"naskah": "\n\n".join(urutan), "judul": judul, "keterangan": keterangan, "tagar": tagar,
+             "path": path_mp4, "durasi": durasi}
     return hasil
