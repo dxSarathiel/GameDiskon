@@ -3,6 +3,25 @@
 # Jangan tampilkan daftar isi folder kepada pengunjung
 Options -Indexes
 
+# Halaman "tidak ditemukan" milik situs sendiri (dibuat halaman.py)
+ErrorDocument 404 /404.html
+
+# Simpan file statis di cache browser. gaya.css aman disimpan lama karena alamatnya
+# berubah (?v=...) setiap kali tampilannya diubah. Halaman HTML tidak disimpan lama.
+<IfModule mod_expires.c>
+ExpiresActive On
+ExpiresByType text/css "access plus 1 year"
+ExpiresByType font/woff2 "access plus 1 year"
+ExpiresByType application/font-woff2 "access plus 1 year"
+ExpiresByType image/png "access plus 1 week"
+ExpiresByType image/x-icon "access plus 1 week"
+ExpiresByType image/vnd.microsoft.icon "access plus 1 week"
+ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+<IfModule mod_mime.c>
+AddType font/woff2 .woff2
+</IfModule>
+
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
