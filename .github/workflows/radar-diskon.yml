@@ -41,9 +41,14 @@ jobs:
         run: |
           if [ -z "$KUNCI" ]; then echo "Secret ALARM_KUNCI kosong"; exit 1; fi
           SHA=$(git rev-parse HEAD)
-          HASIL=$(curl -sS --max-time 240 -X POST -H "X-Kunci: $KUNCI" "https://gamediskon.my.id/bot/tarik.php?sha=$SHA")
-          echo "$HASIL"
-          echo "$HASIL" | grep -q '"ok":true'
+          # Perlindungan anti-bot hosting kadang membalas dengan halaman "One moment, please...": coba sampai 4 kali
+          for i in 1 2 3 4; do
+            HASIL=$(curl -sS --max-time 240 -X POST -H "X-Kunci: $KUNCI" "https://gamediskon.my.id/bot/tarik.php?sha=$SHA" || true)
+            if echo "$HASIL" | grep -q '"ok":true'; then echo "$HASIL"; exit 0; fi
+            echo "Percobaan $i belum berhasil: $(echo "$HASIL" | head -c 120)"
+            sleep 20
+          done
+          exit 1
 
       - name: Upload halaman ke hosting Rumahweb
         id: upload1
@@ -91,7 +96,14 @@ jobs:
           KUNCI: ${{ secrets.ALARM_KUNCI }}
         run: |
           if [ -z "$KUNCI" ]; then echo "Secret ALARM_KUNCI belum diisi, alarm harga dilewati."; exit 0; fi
-          curl -fsS --max-time 120 -X POST -H "X-Kunci: $KUNCI" https://gamediskon.my.id/bot/periksa.php
+          # Pastikan yang menjawab benar-benar periksa.php (bukan halaman anti-bot): coba sampai 4 kali
+          for i in 1 2 3 4; do
+            HASIL=$(curl -sS --max-time 120 -X POST -H "X-Kunci: $KUNCI" https://gamediskon.my.id/bot/periksa.php || true)
+            if echo "$HASIL" | grep -q '"alarm_aktif"'; then echo "$HASIL"; exit 0; fi
+            echo "Percobaan $i belum berhasil: $(echo "$HASIL" | head -c 120)"
+            sleep 20
+          done
+          exit 1
 
       - name: Kabari pemilik kalau ada langkah yang gagal
         # Berjalan hanya kalau salah satu langkah di atas gagal (misalnya upload FTP, simpan data, atau alarm harga)
