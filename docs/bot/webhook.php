@@ -40,6 +40,10 @@ function tangani_pesan($chat, $teks) {
         return;
     }
     if (preg_match('/^\/(bantuan|help)\b/', $teks)) { kirim($chat, sambutan()); return; }
+    if (preg_match('/^\/idsaya\b/', $teks)) {
+        kirim($chat, 'ID chat kamu: <code>' . h($chat) . "</code>\n\nPemilik GameDiskon memakai ID ini untuk menerima video harian dari bot.");
+        return;
+    }
     if ($teks !== '' && $teks[0] === '/') { kirim($chat, 'Perintah itu tidak dikenal. Ketik /bantuan untuk melihat caranya.'); return; }
 
     // Sedang menunggu angka target untuk game yang baru dipilih?
