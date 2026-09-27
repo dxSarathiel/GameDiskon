@@ -20,12 +20,22 @@ from html import escape, unescape
 
 import requests
 
+# ---------- Peringatan untuk pemilik ----------
+# Setiap masalah dicatat di sini, lalu dikirim sekaligus ke chat pribadi pemilik di akhir run.
+PERINGATAN = []
+
+
+def catat_masalah(teks):
+    print("MASALAH:", teks)
+    PERINGATAN.append(teks)
+
+
 from gambar import buat_gambar
 try:
     from halaman import buat_halaman, url_situs
 except Exception as err:
     # Kesalahan di halaman.py tidak boleh menghentikan posting Telegram
-    print("halaman.py bermasalah, halaman web dilewati:", err)
+    catat_masalah(f"halaman.py bermasalah, halaman web dilewati: {err}")
     buat_halaman = None
 
     def url_situs():
@@ -35,7 +45,7 @@ try:
     from halaman_game import buat_halaman_game, buat_slug, jalur_game
 except Exception as err:
     # Kesalahan di halaman_game.py hanya melewatkan halaman per game
-    print("halaman_game.py bermasalah, halaman per game dilewati:", err)
+    catat_masalah(f"halaman_game.py bermasalah, halaman per game dilewati: {err}")
     buat_halaman_game = None
 
     def buat_slug(nama):
@@ -47,7 +57,7 @@ except Exception as err:
 try:
     from afiliasi import baris_telegram
 except Exception as err:
-    print("afiliasi.py bermasalah, baris voucher di Telegram dilewati:", err)
+    catat_masalah(f"afiliasi.py bermasalah, baris voucher di Telegram dilewati: {err}")
 
     def baris_telegram():
         return ""
@@ -55,13 +65,13 @@ except Exception as err:
 try:
     from halaman_info import buat_halaman_info
 except Exception as err:
-    print("halaman_info.py bermasalah, halaman Tentang/Privasi/Kontak dilewati:", err)
+    catat_masalah(f"halaman_info.py bermasalah, halaman Tentang/Privasi/Kontak dilewati: {err}")
     buat_halaman_info = None
 
 try:
     from halaman_artikel import buat_halaman_artikel
 except Exception as err:
-    print("halaman_artikel.py bermasalah, artikel panduan dilewati:", err)
+    catat_masalah(f"halaman_artikel.py bermasalah, artikel panduan dilewati: {err}")
     buat_halaman_artikel = None
 
 # ---------- Pengaturan (ubah sesuai selera) ----------
@@ -238,16 +248,27 @@ def ambil_harga_idr(appids):
 
 
 # ---------- Sumber 1 + 2: Steam ----------
+CHEAPSHARK_GAGAL = False   # diisi True kalau CheapShark tidak bisa diakses di run ini
+
+
 def ambil_kandidat_cheapshark():
     kandidat = {}
     for halaman in range(HALAMAN_CHEAPSHARK):
-        r = session.get(
-            "https://www.cheapshark.com/api/1.0/deals",
-            params={"storeID": 1, "onSale": 1, "sortBy": "Deal Rating",
-                    "pageSize": 60, "pageNumber": halaman},
-            timeout=30,
-        )
-        r.raise_for_status()
+        for percobaan in range(3):          # server CheapShark kadang lambat: coba sampai 3 kali
+            try:
+                r = session.get(
+                    "https://www.cheapshark.com/api/1.0/deals",
+                    params={"storeID": 1, "onSale": 1, "sortBy": "Deal Rating",
+                            "pageSize": 60, "pageNumber": halaman},
+                    timeout=45,
+                )
+                r.raise_for_status()
+                break
+            except Exception:
+                if percobaan == 2:
+                    raise
+                print(f"CheapShark lambat/gagal, coba lagi ({percobaan + 2}/3)...")
+                time.sleep(15)
         for d in r.json():
             if d.get("steamAppID"):
                 kandidat[d["steamAppID"]] = d
@@ -256,7 +277,15 @@ def ambil_kandidat_cheapshark():
 
 
 def proses_steam(state, riwayat):
-    kandidat = ambil_kandidat_cheapshark()
+    global CHEAPSHARK_GAGAL
+    try:
+        kandidat = ambil_kandidat_cheapshark()
+    except Exception as err:
+        # Tanpa CheapShark tidak ada daftar diskon baru, tapi harga game yang sudah dipantau tetap dicek
+        CHEAPSHARK_GAGAL = True
+        catat_masalah(f"CheapShark tidak bisa diakses ({err}). Harga game yang sudah dipantau tetap dicek, "
+                      f"tapi rak diskon di beranda tidak diperbarui hari ini.")
+        kandidat = {}
 
     # Semua kandidat hari ini ikut dipantau, lalu digabung dengan yang sudah dipantau.
     # Kalau melebihi batas, game yang paling lama tidak muncul sebagai kandidat
@@ -416,7 +445,7 @@ def kirim_pesan_kosong(state, epic_semua, steam_layak, semua_sumber_gagal):
         return
     if semua_sumber_gagal:
         # Jangan bilang "tidak ada diskon" kalau sebenarnya datanya gagal diambil
-        print("Semua sumber gagal, pesan hari kosong tidak dikirim.")
+        catat_masalah("Semua sumber data gagal (Epic dan Steam), pesan hari kosong tidak dikirim.")
         return
     kunci = f"pesan-kosong:{HARI_INI}"
     if kunci in state:
@@ -451,7 +480,7 @@ def kirim_video_harian(state, epic_semua, steam_layak):
         from video import buat_video
         from gaya import USERNAME_BOT_ALARM
     except Exception as err:
-        print("video.py bermasalah, video dilewati:", err)
+        catat_masalah(f"video.py bermasalah, video dilewati: {err}")
         return
 
     batas = datetime.now(timezone.utc) - timedelta(days=7)
@@ -499,7 +528,7 @@ def _telegram(metode, data, files=None):
     r = requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{metode}",
                       data=data, files=files, timeout=60)
     if not r.ok:
-        print(f"{metode} gagal:", r.text)
+        catat_masalah(f"Telegram {metode} gagal: {r.text[:300]}")
     return r.ok
 
 
@@ -530,7 +559,7 @@ def kirim_telegram(teks, path_gambar=None):
     return _telegram("sendMessage", dict(dasar, text=teks, disable_web_page_preview="true"))
 
 
-def main():
+def _main():
     state = baca_json(STATE_FILE)
     riwayat = baca_json(RIWAYAT_FILE)
 
@@ -538,7 +567,7 @@ def main():
     try:
         epic_semua = ambil_gratis_epic()
     except Exception as err:
-        print("Epic gagal:", err)
+        catat_masalah(f"Data Epic gagal diambil: {err}")
         epic_semua = []
         epic_gagal = True
     else:
@@ -552,8 +581,10 @@ def main():
         # Riwayat disimpan SETIAP hari, walaupun tidak ada yang diposting
         tulis_json(RIWAYAT_FILE, riwayat, rapi=False)
         print(f"Harga dicatat: {jumlah_dicek} game dicek, total {len(riwayat)} game dipantau.")
+        if jumlah_dicek == 0:
+            catat_masalah("Tidak ada satu pun harga Steam yang berhasil dicek hari ini (sumber data mungkin berubah).")
     except Exception as err:
-        print("Steam/CheapShark gagal:", err)
+        catat_masalah(f"Data Steam/CheapShark gagal diambil: {err}")
         steam_gagal = True
 
     # Halaman web juga diperbarui setiap hari, termasuk hari tanpa posting baru
@@ -562,40 +593,46 @@ def main():
         import gaya
         gaya.LINK_TELEGRAM = link_channel()      # tombol Telegram di pita semua halaman
     except Exception as err:
-        print("gaya.py bermasalah:", err)
+        catat_masalah(f"gaya.py bermasalah: {err}")
     if BUAT_HALAMAN and buat_halaman_game and riwayat:
         try:
             halaman_lain = buat_halaman_game(riwayat, link_telegram=link_channel())
         except Exception as err:
-            print("Halaman game gagal dibuat:", err)
+            catat_masalah(f"Halaman game gagal dibuat: {err}")
     if BUAT_HALAMAN and buat_halaman_info:
         try:
             halaman_lain += buat_halaman_info(link_telegram=link_channel(), nama_channel=NAMA_CHANNEL)
         except Exception as err:
-            print("Halaman info gagal dibuat:", err)
+            catat_masalah(f"Halaman info gagal dibuat: {err}")
     if BUAT_HALAMAN and buat_halaman_artikel:
         try:
             halaman_lain += buat_halaman_artikel(epic_semua)
         except Exception as err:
-            print("Artikel gagal dibuat:", err)
-    if BUAT_HALAMAN and buat_halaman and (epic_semua or steam_layak):
+            catat_masalah(f"Artikel gagal dibuat: {err}")
+    if CHEAPSHARK_GAGAL and not steam_layak:
+        # Jangan menimpa beranda kemarin dengan rak diskon yang kosong
+        print("Beranda tidak diperbarui karena daftar diskon hari ini tidak tersedia.")
+    elif BUAT_HALAMAN and buat_halaman and (epic_semua or steam_layak):
         try:
             path = buat_halaman(epic_semua, steam_layak, link_telegram=link_channel(),
                                 nama_channel=NAMA_CHANNEL, google_verifikasi=GOOGLE_VERIFIKASI,
                                 event=event_hari_ini(), halaman_lain=halaman_lain)
             print(f"Halaman web diperbarui: {path} ({len(steam_layak)} diskon Steam, {len(epic_semua)} gratis Epic)")
         except Exception as err:
-            print("Halaman web gagal dibuat:", err)
+            catat_masalah(f"Halaman web (beranda) gagal dibuat: {err}")
 
     # Video harian untuk TikTok/Shorts, dikirim ke chat pribadi (tidak bergantung pada deal baru)
     try:
         kirim_video_harian(state, epic_semua, steam_layak)
     except Exception as err:
-        print("Video gagal dibuat:", err)
+        catat_masalah(f"Video gagal dibuat: {err}")
 
     if not epic and not steam:
         print("Tidak ada deal baru hari ini.")
-        kirim_pesan_kosong(state, epic_semua, steam_layak, epic_gagal and steam_gagal)
+        if CHEAPSHARK_GAGAL:
+            print("Pesan hari kosong tidak dikirim karena daftar diskon hari ini tidak tersedia.")
+        else:
+            kirim_pesan_kosong(state, epic_semua, steam_layak, epic_gagal and steam_gagal)
         return
 
     path_gambar = None
@@ -606,13 +643,46 @@ def main():
             path_gambar = buat_gambar(epic, steam, GAMBAR_FILE, session,
                                       NAMA_CHANNEL, link_channel(), label_event)
         except Exception as err:
-            print("Gambar gagal dibuat, kirim teks saja:", err)
+            catat_masalah(f"Gambar posting gagal dibuat, dikirim teks saja: {err}")
 
     if kirim_telegram(susun_pesan(epic, steam), path_gambar):
         sekarang = datetime.now(timezone.utc).isoformat()
         for g in epic + steam:
             state[g["kunci"]] = sekarang
         simpan_state(state)
+
+
+def kirim_peringatan():
+    """Kirim semua masalah yang tercatat ke chat pribadi pemilik (bukan ke channel)."""
+    if not PERINGATAN:
+        return
+    if not (TELEGRAM_TOKEN and TELEGRAM_OWNER_ID):
+        print(f"[DRY RUN] {len(PERINGATAN)} peringatan tidak dikirim (TELEGRAM_OWNER_ID kosong).")
+        return
+    log = ""
+    if os.getenv("GITHUB_RUN_ID"):
+        log = (f"\n\n🔎 <a href=\"{os.getenv('GITHUB_SERVER_URL', 'https://github.com')}/"
+               f"{os.getenv('GITHUB_REPOSITORY')}/actions/runs/{os.getenv('GITHUB_RUN_ID')}\">Buka log run ini</a>")
+    unik = list(dict.fromkeys(PERINGATAN))[:10]
+    teks = (f"⚠️ <b>Radar GameDiskon: ada {len(unik)} masalah</b> ({datetime.now(WIB):%d/%m %H:%M} WIB)\n\n"
+            + "\n".join("• " + escape(t[:400]) for t in unik) + log)
+    try:
+        # Langsung lewat requests, bukan _telegram, supaya kegagalan di sini tidak tercatat berulang
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                      data={"chat_id": TELEGRAM_OWNER_ID, "text": teks, "parse_mode": "HTML",
+                            "disable_web_page_preview": "true"}, timeout=30)
+    except Exception as err:
+        print("Peringatan gagal dikirim:", err)
+
+
+def main():
+    try:
+        _main()
+    except Exception as err:
+        catat_masalah(f"Bot berhenti karena error: {type(err).__name__}: {err}")
+        raise
+    finally:
+        kirim_peringatan()
 
 
 if __name__ == "__main__":
