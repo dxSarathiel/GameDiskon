@@ -33,8 +33,21 @@ jobs:
           git config user.email "radar-bot@users.noreply.github.com"
           for f in sent.json harga_idr.json docs; do if [ -e "$f" ]; then git add "$f"; fi; done
           git diff --cached --quiet || (git commit -m "update data harian" && git push)
+      - name: Terbitkan ke hosting (hosting menarik docs dari GitHub)
+        id: tarik
+        continue-on-error: true   # kalau gagal, upload FTP di bawah jadi cadangan
+        env:
+          KUNCI: ${{ secrets.ALARM_KUNCI }}
+        run: |
+          if [ -z "$KUNCI" ]; then echo "Secret ALARM_KUNCI kosong"; exit 1; fi
+          SHA=$(git rev-parse HEAD)
+          HASIL=$(curl -sS --max-time 240 -X POST -H "X-Kunci: $KUNCI" "https://gamediskon.my.id/bot/tarik.php?sha=$SHA")
+          echo "$HASIL"
+          echo "$HASIL" | grep -q '"ok":true'
+
       - name: Upload halaman ke hosting Rumahweb
         id: upload1
+        if: steps.tarik.outcome != 'success'
         continue-on-error: true   # kalau gagal, dicoba sekali lagi di bawah
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
@@ -73,7 +86,7 @@ jobs:
 
       - name: Kirim alarm harga
         # Hanya kalau upload berhasil, supaya bot di hosting membaca harga hari ini
-        if: steps.upload1.outcome == 'success' || steps.upload2.outcome == 'success'
+        if: steps.tarik.outcome == 'success' || steps.upload1.outcome == 'success' || steps.upload2.outcome == 'success'
         env:
           KUNCI: ${{ secrets.ALARM_KUNCI }}
         run: |
@@ -82,7 +95,7 @@ jobs:
 
       - name: Kabari pemilik kalau ada langkah yang gagal
         # Berjalan hanya kalau salah satu langkah di atas gagal (misalnya upload FTP, simpan data, atau alarm harga)
-        if: failure()
+        if: failure() || steps.tarik.outcome == 'failure'
         env:
           TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           PEMILIK: ${{ secrets.TELEGRAM_OWNER_ID }}
@@ -92,4 +105,4 @@ jobs:
           curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
             --data-urlencode "chat_id=$PEMILIK" \
             --data-urlencode "disable_web_page_preview=true" \
-            --data-urlencode "text=🚨 Workflow Radar Diskon GAGAL di salah satu langkahnya (bisa upload ke hosting, simpan data, atau alarm harga). Situs mungkin belum diperbarui hari ini. Cek log: $LOG" > /dev/null
+            --data-urlencode "text=🚨 Workflow Radar Diskon: ada langkah yang gagal (penerbitan ke hosting, simpan data, atau alarm harga). Kalau penerbitan lewat tarik.php gagal, upload FTP dipakai sebagai cadangan. Cek log: $LOG" > /dev/null
