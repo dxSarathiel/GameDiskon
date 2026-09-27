@@ -26,6 +26,12 @@ BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
 HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 MAKS_ITEM_HALAMAN = 60
 
+# Judul dan meta deskripsi beranda (tampil di tab browser dan hasil pencarian Google).
+# Ubah di sini kalau ingin merevisinya lagi.
+JUDUL_BERANDA = "Game Diskon | Kumpulan Game Diskon & Game Gratis Update Setiap Hari"
+DESKRIPSI_BERANDA = ("Game Diskon hadirkan informasi tentang game diskon & gratis dengan harga Rupiah"
+                     "di Steam dan Epic Games Store. Dapatkan game-game tersebut sebelum ketinggalan.")
+
 
 # Alamat situs utama. Dipakai untuk tautan kanonik, sitemap, dan link di postingan Telegram.
 ALAMAT_SITUS = "https://gamediskon.my.id/"
@@ -187,27 +193,17 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
     situs = url_situs()
     steam = steam[:MAKS_ITEM_HALAMAN]
 
-    judul_halaman = f"Diskon Steam Hari Ini dalam Rupiah & Game Gratis Epic ({_tanggal_panjang(sekarang)})"
-    if steam:
-        g0 = steam[0]
-        deskripsi = (f"{len(steam)} diskon Steam pilihan dengan harga asli region Indonesia, "
-                     f"mulai dari {g0['judul']} {_rupiah(g0['harga_akhir'])} (-{g0['diskon']}%). "
-                     f"Diperbarui setiap hari.")
-    else:
-        deskripsi = "Diskon Steam pilihan dengan harga asli region Indonesia dan game gratis Epic. Diperbarui setiap hari."
-    if epic:
-        deskripsi = f"Gratis di Epic: {', '.join(g['judul'] for g in epic)}. " + deskripsi
+    judul_halaman = JUDUL_BERANDA
+    deskripsi = DESKRIPSI_BERANDA
     og_gambar = (epic[0]["gambar"] if epic else steam[0]["gambar"] if steam else "")
 
     # --- Event sale (Autumn Sale, Winter Sale, dst.) ---
     teks_event = ""
     if event:
         if event["status"] == "berlangsung":
-            judul_halaman = f"{event['nama']}: Diskon Harian dalam Rupiah ({_tanggal_panjang(sekarang)})"
             teks_event = f"{event['nama']} sedang berlangsung, {event['periode']}."
         else:
             teks_event = f"{event['nama']} dimulai {event['mulai_teks']}."
-        deskripsi = f"{teks_event} {deskripsi}"
 
     # --- Judul besar di pita biru ---
     ringkas = []
