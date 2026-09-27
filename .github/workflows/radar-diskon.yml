@@ -79,3 +79,17 @@ jobs:
         run: |
           if [ -z "$KUNCI" ]; then echo "Secret ALARM_KUNCI belum diisi, alarm harga dilewati."; exit 0; fi
           curl -fsS --max-time 120 -X POST -H "X-Kunci: $KUNCI" https://gamediskon.my.id/bot/periksa.php
+
+      - name: Kabari pemilik kalau ada langkah yang gagal
+        # Berjalan hanya kalau salah satu langkah di atas gagal (misalnya upload FTP, simpan data, atau alarm harga)
+        if: failure()
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          PEMILIK: ${{ secrets.TELEGRAM_OWNER_ID }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$PEMILIK" ]; then exit 0; fi
+          LOG="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$PEMILIK" \
+            --data-urlencode "disable_web_page_preview=true" \
+            --data-urlencode "text=🚨 Workflow Radar Diskon GAGAL di salah satu langkahnya (bisa upload ke hosting, simpan data, atau alarm harga). Situs mungkin belum diperbarui hari ini. Cek log: $LOG" > /dev/null
