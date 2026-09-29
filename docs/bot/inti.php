@@ -14,6 +14,7 @@ if (!defined('GAMEDISKON_BOT')) { http_response_code(404); exit; }
 define('FOLDER_RAHASIA', getenv('GAMEDISKON_BOT_DIR') ?: dirname(__DIR__, 2) . '/gamediskon-bot');
 define('FILE_HARGA', dirname(__DIR__) . '/data/harga.json');
 define('SITUS', 'https://gamediskon.my.id/');
+define('REPO_GITHUB', 'dxsarathiel/GameDiskon');
 define('MAKS_ALARM_PER_ORANG', 10);
 define('MAKS_HASIL_CARI', 6);
 
