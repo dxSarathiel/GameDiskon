@@ -1,0 +1,59 @@
+name: Pengalihan GitHub Pages ke domain
+
+# Alamat lama (dxsarathiel.github.io/GameDiskon/) masih muncul di Google.
+# Workflow ini menerbitkan dua halaman kecil di alamat lama yang langsung mengalihkan
+# pengunjung dan Google ke https://gamediskon.my.id/. Cukup dijalankan sekali lewat
+# tab Actions -> "Pengalihan GitHub Pages ke domain" -> Run workflow.
+# Workflow harian bot tidak terpengaruh.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  terbitkan:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Buat halaman pengalihan
+        run: |
+          mkdir -p pengalihan
+          cat > pengalihan/index.html <<'HTML'
+          <!doctype html>
+          <html lang="id">
+          <head>
+          <meta charset="utf-8">
+          <title>GameDiskon sudah pindah ke gamediskon.my.id</title>
+          <link rel="canonical" href="https://gamediskon.my.id/">
+          <meta http-equiv="refresh" content="0; url=https://gamediskon.my.id/">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <script>location.replace("https://gamediskon.my.id/");</script>
+          <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0d13;color:#eef1f7;font-family:system-ui,sans-serif;text-align:center;padding:1.5rem}a{color:#b8f229}</style>
+          </head>
+          <body>
+          <p>GameDiskon sudah pindah ke <a href="https://gamediskon.my.id/">gamediskon.my.id</a>.</p>
+          </body>
+          </html>
+          HTML
+          # Alamat lain di bawah alamat lama juga diarahkan ke situs baru
+          cp pengalihan/index.html pengalihan/404.html
+          touch pengalihan/.nojekyll
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: pengalihan
+
+      - id: deploy
+        uses: actions/deploy-pages@v5
