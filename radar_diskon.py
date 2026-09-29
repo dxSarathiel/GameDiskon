@@ -758,9 +758,33 @@ def kirim_peringatan():
         print("Peringatan gagal dikirim:", err)
 
 
+def sudah_jalan_barusan():
+    """Jadwal otomatis GitHub sering terlambat berjam-jam. Kalau run terjadwal datang padahal bot
+    sudah jalan (dipicu hosting) kurang dari 20 jam lalu, run terjadwal itu dilewati.
+    Run manual / dari pemicu hosting selalu dijalankan."""
+    if os.getenv("GITHUB_EVENT_NAME") != "schedule":
+        return False
+    terakhir = baca_json(STATE_FILE).get("run-terakhir")
+    try:
+        selisih = datetime.now(timezone.utc) - datetime.fromisoformat(terakhir)
+    except Exception:
+        return False
+    return selisih < timedelta(hours=20)
+
+
+def catat_run_selesai():
+    state = baca_json(STATE_FILE)
+    state["run-terakhir"] = datetime.now(timezone.utc).isoformat()
+    simpan_state(state)
+
+
 def main():
+    if sudah_jalan_barusan():
+        print("Run terjadwal dilewati: bot sudah dijalankan pemicu hosting kurang dari 20 jam lalu.")
+        return
     try:
         _main()
+        catat_run_selesai()
     except Exception as err:
         catat_masalah(f"Bot berhenti karena error: {type(err).__name__}: {err}")
         raise
