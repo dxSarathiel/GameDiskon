@@ -34,6 +34,17 @@ function konfigurasi($muat_ulang = false) {
     return $k;
 }
 
+// Dijalankan lewat Cron Job cPanel (baris perintah), bukan lewat alamat web?
+function dari_cron() {
+    return PHP_SAPI === 'cli';
+}
+
+// Kabari pemilik lewat Telegram kalau ada masalah (butuh 'pemilik' => ID chat di config.php)
+function kabari_pemilik($teks) {
+    $pemilik = konfigurasi()['pemilik'] ?? '';
+    if ($pemilik !== '') { kirim($pemilik, $teks); }
+}
+
 // Cocokkan kunci kiriman dengan kunci tersimpan. Kunci kosong selalu ditolak.
 function kunci_cocok($tersimpan, $kiriman) {
     return (string)$tersimpan !== '' && hash_equals((string)$tersimpan, (string)$kiriman);

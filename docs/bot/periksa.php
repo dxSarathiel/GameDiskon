@@ -1,16 +1,16 @@
 <?php
 /*
- * Dipanggil GitHub Actions setelah halaman diperbarui setiap hari.
+ * Dijalankan Cron Job cPanel tiap 2 jam (cara utama), atau dipanggil lewat web dengan header X-Kunci.
  * Mencocokkan semua alarm dengan harga terbaru, mengirim kabar, lalu menghapus alarm yang sudah terpenuhi.
  */
 define('GAMEDISKON_BOT', true);
 require __DIR__ . '/inti.php';
 
 $kunci = $_SERVER['HTTP_X_KUNCI'] ?? '';
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !kunci_cocok(konfigurasi()['kunci_periksa'], $kunci)) {
+if (!dari_cron() && ($_SERVER['REQUEST_METHOD'] !== 'POST' || !kunci_cocok(konfigurasi()['kunci_periksa'], $kunci))) {
     http_response_code(403); exit;
 }
-header('Content-Type: application/json');
+if (!dari_cron()) { header('Content-Type: application/json'); }
 
 $terpenuhi = [];   // [chat, appid, target]
 $semua = baca_data()['alarm'];

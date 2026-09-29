@@ -3,8 +3,9 @@
  * Menerbitkan situs dengan cara MENARIK isi folder docs/ langsung dari GitHub (lewat HTTPS),
  * sebagai pengganti upload FTP yang sering timeout.
  *
- * Dipanggil GitHub Actions setelah bot selesai:
- *   POST https://gamediskon.my.id/bot/tarik.php?sha=<commit>   dengan header X-Kunci: <kunci periksa>
+ * Cara utama: Cron Job cPanel menjalankannya tiap 30 menit (tidak lewat web, jadi tidak kena anti-bot):
+ *   /usr/local/bin/php /home/<akun>/public_html/bot/tarik.php
+ * Cara lama (masih bisa): POST https://gamediskon.my.id/bot/tarik.php?sha=<commit> dengan header X-Kunci.
  * Hanya file di dalam docs/ yang disalin, dan hanya file yang isinya berubah yang ditulis ulang.
  */
 define('GAMEDISKON_BOT', true);
@@ -12,10 +13,19 @@ require __DIR__ . '/inti.php';
 
 define('REPO', 'dxsarathiel/GameDiskon');
 
-header('Content-Type: application/json');
-function selesai($data, $kode = 200) { http_response_code($kode); echo json_encode($data); exit; }
+function selesai($data, $kode = 200) {
+    if (dari_cron()) {
+        echo json_encode($data) . "\n";
+        if (empty($data['ok'])) {
+            kabari_pemilik("⚠️ tarik.php gagal menerbitkan situs: " . ($data['pesan'] ?? 'tanpa keterangan'));
+        }
+        exit(empty($data['ok']) ? 1 : 0);
+    }
+    http_response_code($kode); echo json_encode($data); exit;
+}
+if (!dari_cron()) { header('Content-Type: application/json'); }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !kunci_cocok(konfigurasi()['kunci_periksa'], $_SERVER['HTTP_X_KUNCI'] ?? '')) {
+if (!dari_cron() && ($_SERVER['REQUEST_METHOD'] !== 'POST' || !kunci_cocok(konfigurasi()['kunci_periksa'], $_SERVER['HTTP_X_KUNCI'] ?? ''))) {
     selesai(['ok' => false, 'pesan' => 'ditolak'], 403);
 }
 if (!class_exists('ZipArchive')) { selesai(['ok' => false, 'pesan' => 'PHP di hosting tidak punya modul zip'], 500); }
