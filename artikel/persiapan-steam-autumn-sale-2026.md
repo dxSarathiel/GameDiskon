@@ -1,14 +1,15 @@
 ---
-judul: Steam Autumn Sale 2026 Segera Tiba: Hal yang Perlu Kamu Siapkan untuk Menyambut Sale Tersebut
-deskripsi: Steam Autumn Sale 2026 mulai 2 Oktober pukul 00.00 WIB. Ini yang perlu kamu siapkan: wishlist, budget, cek riwayat harga, sampai aturan refund Steam.
+judul: Steam Autumn Sale 2026 (2–9 Okt): Hal yang Perlu Kamu Siapkan
+deskripsi: Steam Autumn Sale 2026 berlangsung 2–9 Oktober (WIB). Ini yang perlu kamu siapkan: wishlist, budget, cek riwayat harga, sampai aturan refund Steam.
 tanggal: 2026-09-29
+diperbarui: 2026-10-02
 ---
 
 Halo semuanya! Perkenalkan, saya Sarathiel, pengurus GameDiskon. Di sini saya rutin mengabarkan game diskon dan game gratis dari Steam maupun Epic Games Store, dengan harga Rupiah asli.
 
-Gimana kabar kalian? Semoga baik-baik aja, ya. Ada info penting nih, ges: **Steam Autumn Sale 2026 dimulai Jumat, 2 Oktober 2026 pukul 00.00 WIB**, alias tengah malam dari Kamis ke Jumat. Sale-nya berlangsung seminggu dan berakhir **Jumat, 9 Oktober 2026 pukul 00.00 WIB**.
+Gimana kabar kalian? Semoga baik-baik aja, ya. Ada info penting nih, ges: **Steam Autumn Sale 2026 sudah dimulai Jumat, 2 Oktober 2026 pukul 00.00 WIB**, alias tengah malam dari Kamis ke Jumat. Sale-nya berlangsung seminggu dan berakhir **Jumat, 9 Oktober 2026 pukul 00.00 WIB**, jadi masih ada waktu untuk bersiap sebelum belanja.
 
-Steam Sale selalu menarik perhatian saya, karena banyak game bagus yang tiba-tiba dapat potongan besar. Terus, apa saja sih yang perlu disiapkan untuk menyambut Steam Autumn Sale 2026 ini?
+Steam Sale selalu menarik perhatian saya, karena banyak game bagus yang tiba-tiba dapat potongan besar. Terus, apa saja sih yang perlu disiapkan supaya belanja di Steam Autumn Sale 2026 ini nggak menyesal? Daftar diskon terbaik hari ini dan jadwal lengkapnya ada di halaman [Jadwal Steam Sale](/jadwal-steam-sale/).
 
 ## 1. Rapikan wishlist kamu
 
