@@ -207,6 +207,19 @@ SKRIP_BERANDA = """<script>
 </script>"""
 
 
+def _papan_led(steam, jumlah=12):
+    """Papan LED berjalan di bawah judul beranda: potongan terbesar hari ini.
+    Hanya hiasan (aria-hidden): isinya sama dengan rak di bawahnya. Daftarnya ditulis dua kali
+    supaya putarannya menyambung tanpa jeda."""
+    if not steam:
+        return ""
+    teratas = sorted(steam, key=lambda g: (-g["diskon"], g["harga_akhir"]))[:jumlah]
+    item = "".join(f'<li>{escape(g["judul"])}<b>-{g["diskon"]}%</b>{_rupiah(g["harga_akhir"])}</li>'
+                   for g in teratas)
+    return f"""
+  <div class="led" aria-hidden="true"><ul class="led-isi">{item}{item}</ul></div>"""
+
+
 def _jsonld_beranda(situs, deskripsi):
     """Data terstruktur beranda: nama situs (WebSite) dan pengelolanya (Organization)."""
     return {
@@ -285,7 +298,8 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
     hero = f"""
     <div class="hero">
       <div>
-        <h1>Diskon Steam hari ini, dalam Rupiah</h1>
+        <p class="kicker">Promo game PC, dicek tiap hari</p>
+        <h1><span class="baris">Diskon Steam</span> <span class="baris">hari ini,</span> <span class="sorot">dalam Rupiah</span></h1>
         <p>{escape(kalimat)} Harga diambil langsung dari Steam region Indonesia, bukan hasil konversi dolar.</p>{event_html}
       </div>{unggulan}
     </div>"""
@@ -384,7 +398,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
       <ul class="daftar-artikel">{item}</ul>
       <p class="catatan" style="margin-top:1rem"><a href="/info-game/">Semua Info Game</a></p>
     </section>"""
-    html = halaman_utuh(head, pita(link_telegram, hero=hero), bagian_epic + bagian_steam + ajakan_alarm + blok_beranda() + bagian_info + tanya,
+    html = halaman_utuh(head, pita(link_telegram, hero=hero, setelah=_papan_led(steam)), bagian_epic + bagian_steam + ajakan_alarm + blok_beranda() + bagian_info + tanya,
                         script=SKRIP_BERANDA)
     with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as f:
         f.write(html)

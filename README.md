@@ -40,8 +40,8 @@ Syarat diskon yang tampil di rak (bisa diubah di bagian atas `radar_diskon.py`):
 | `halaman_khusus.py` | Dua halaman tetap yang diperbarui tiap hari: `/game-gratis-epic/` dan `/jadwal-steam-sale/` (jadwal diambil dari `EVENT_SALE` di `radar_diskon.py`). |
 | `info_game.py` | Rubrik Info Game: laporan harga mingguan, game gratis Epic mendatang, dan kabar mingguan. |
 | `halaman_info.py` | Halaman Tentang, Kebijakan Privasi, Kontak. |
-| `gaya.py` | Semua tampilan situs (CSS, menu, kaki halaman, favicon, `<head>`). Ubah warna atau huruf di sini. |
-| `aset/` | Huruf Archivo (.woff2, lisensi OFL) dan gambar pratinjau `og-gamediskon.png`. Disalin otomatis ke `docs/`. |
+| `gaya.py` | Semua tampilan situs (CSS, menu, kaki halaman, favicon, `<head>`). Tema "Etalase Malam": label harga kuning, stiker merah, kupon, papan LED, struk. Ubah warna di bagian Token. |
+| `aset/` | Huruf Archivo (OFL) dan Permanent Marker (Apache 2.0), plus gambar pratinjau `og-gamediskon.png`. Disalin otomatis ke `docs/`. |
 | `afiliasi.py` | Link afiliasi voucher Steam Wallet dan saran nominal voucher. |
 | `gambar.py`, `video.py` | Gambar untuk postingan Telegram dan video vertikal harian. |
 | `artikel/` | Artikel panduan, ditulis tangan dalam Markdown. |
