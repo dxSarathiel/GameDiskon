@@ -254,6 +254,8 @@ def buat_halaman_steam_sale(event_sale, steam_layak=None, folder="docs"):
             teks = (f"<p>Mulai <strong>{escape(_wib(utama['dt_mulai']))}</strong>, "
                     f"berakhir {escape(_wib(utama['dt_selesai']))}.</p>"
                     f'<p class="sisa" data-mulai="{utama["dt_mulai"].isoformat()}"></p>')
+        if utama.get("artikel"):
+            teks += f'<p><a href="{escape(utama["artikel"])}">Baca panduan persiapan {escape(utama["nama"])}</a>: wishlist, budget, cek riwayat harga, dan aturan refund.</p>'
         isi.append(f"""
     <aside class="voucher lebar" aria-labelledby="h-utama">
       <div>

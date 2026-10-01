@@ -109,7 +109,8 @@ GOOGLE_VERIFIKASI = "NeGuLjS_j7yta3znaeJWo-JRiksuR9yDI_F7atB-RqU" # isi kode dar
 # ---------- Event sale besar ----------
 # Tanggal dari jadwal resmi Steamworks. Tambahkan event baru dengan format yang sama.
 EVENT_SALE = [
-    {"nama": "Steam Autumn Sale 2026", "mulai": "2026-10-01", "selesai": "2026-10-08", "emoji": "🍂"},
+    {"nama": "Steam Autumn Sale 2026", "mulai": "2026-10-01", "selesai": "2026-10-08", "emoji": "🍂",
+     "artikel": "/panduan/persiapan-steam-autumn-sale-2026/"},   # panduan terkait (opsional)
     {"nama": "Steam Winter Sale 2026", "mulai": "2026-12-17", "selesai": "2027-01-04", "emoji": "❄️"},
 ]
 HARI_PENGUMUMAN_EVENT = 3   # mulai diumumkan sekian hari sebelum event
@@ -352,7 +353,7 @@ def proses_steam(state, riwayat):
             "terendah_sejak": label.get(appid),
             "url": f"https://store.steampowered.com/app/{appid}/",
             "halaman": jalur_game(appid, riwayat[appid].get("slug")) if appid in riwayat else "",
-            "gambar": f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg",
+            "gambar": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg",
         })
 
     # Yang harganya terendah tercatat didahulukan, lalu yang diskonnya terbesar
@@ -639,6 +640,14 @@ def _main():
         # Riwayat disimpan SETIAP hari, walaupun tidak ada yang diposting
         tulis_json(RIWAYAT_FILE, riwayat, rapi=False)
         print(f"Harga dicatat: {jumlah_dicek} game dicek, total {len(riwayat)} game dipantau.")
+        # Detail game (genre, developer, deskripsi) untuk isi halaman game, bertahap tiap run
+        try:
+            from detail_steam import lengkapi_detail
+            di_rak = [m.group(1) for m in (re.search(r"/app/(\d+)", g["url"]) for g in steam_layak) if m]
+            if lengkapi_detail(riwayat, session, utamakan=di_rak):
+                tulis_json(RIWAYAT_FILE, riwayat, rapi=False)
+        except Exception as err:
+            catat_masalah(f"Detail game dari Steam gagal diambil: {err}")
         if jumlah_dicek == 0:
             catat_masalah("Tidak ada satu pun harga Steam yang berhasil dicek hari ini (sumber data mungkin berubah).")
     except Exception as err:

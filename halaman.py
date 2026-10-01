@@ -29,7 +29,7 @@ MAKS_ITEM_HALAMAN = 60
 # Judul dan meta deskripsi beranda (tampil di tab browser dan hasil pencarian Google).
 # Ubah di sini kalau ingin merevisinya lagi.
 # Judul di bawah 60 karakter supaya tidak terpotong di Google; kata kunci utama di depan.
-JUDUL_BERANDA = "Game Diskon | List Game Gratis & Diskon Setiap Hari"
+JUDUL_BERANDA = "Game Diskon Steam Hari Ini (Rupiah) & Game Gratis Epic"
 DESKRIPSI_BERANDA = ("Game Diskon hadirkan informasi tentang game diskon & gratis dengan harga Rupiah "
                      "di Steam dan Epic Games Store. Dapatkan game-game tersebut sebelum ketinggalan.")
 

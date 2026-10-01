@@ -139,6 +139,7 @@ def _html_artikel(a, situs, epic_semua):
         "author": {"@type": "Person", "name": PENULIS},
         "publisher": {"@type": "Organization", "name": "GameDiskon", "url": situs},
         "mainEntityOfPage": url, "inLanguage": "id",
+        "image": f"{situs}og-gamediskon.png",
     }
     return url, _kerangka(a["judul"], a["deskripsi"], url, badan, jsonld=jsonld, aktif="panduan", og_tipe="article")
 
@@ -154,7 +155,8 @@ def _html_daftar(daftar, situs):
       <ul class="daftar-artikel">{item}</ul>
     </div>"""
     deskripsi = "Panduan mendapatkan game gratis dan diskon termurah di Steam dan Epic Games Store untuk pemain di Indonesia."
-    return url, _kerangka("Panduan Berburu Game Murah dan Gratis", deskripsi, url, badan, aktif="panduan")
+    return url, _kerangka("Panduan Berburu Game Murah dan Gratis", deskripsi, url, badan, aktif="panduan",
+                          jsonld={"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Beranda", "item": situs}, {"@type": "ListItem", "position": 2, "name": "Panduan", "item": url}]})
 
 
 def buat_halaman_artikel(epic_semua=None, folder="docs", folder_artikel=FOLDER_ARTIKEL):

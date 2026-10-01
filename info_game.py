@@ -116,6 +116,22 @@ def _tulis_laporan(senin, minggu, turun, naik, termurah):
     bagian = [f"<p>Selama sepekan ({periode}), dari game yang kami pantau setiap hari di Steam Indonesia, "
               f"<strong>{len(turun)} game turun harga</strong> dan <strong>{len(naik)} game naik harga</strong>. "
               f"Kenaikan harga biasanya berarti diskonnya sudah berakhir.</p>"]
+    sorotan = []
+    if turun:
+        t0 = turun[0]
+        persen = round(100 - t0["ke"] * 100 / max(t0["dari"], 1))
+        sorotan.append(f"Penurunan terbesar minggu ini dialami {escape(t0['nama'])}, dari {_rupiah(t0['dari'])} "
+                       f"menjadi {_rupiah(t0['ke'])} (turun sekitar {persen}%).")
+    if termurah:
+        sorotan.append(f"{len(termurah)} game sedang berada di harga termurahnya sejak mulai kami pantau, "
+                       f"jadi kalau ada yang kamu incar, minggu ini saat yang tepat.")
+    if len(turun) >= 20:
+        sorotan.append("Banyaknya penurunan harga dalam satu pekan biasanya menandakan ada event sale besar di Steam. "
+                       'Cek tanggalnya di <a href="/jadwal-steam-sale/">jadwal Steam Sale</a>.')
+    elif naik and len(naik) > len(turun):
+        sorotan.append("Lebih banyak game yang naik harga daripada yang turun, tanda gelombang diskon sebelumnya sedang berakhir.")
+    if sorotan:
+        bagian.append("<h2>Sorotan minggu ini</h2><p>" + " ".join(sorotan) + "</p>")
     if termurah:
         bagian.append("<h2>Sedang di harga termurahnya</h2><p>Game-game ini sekarang ada di harga paling murah "
                       "sejak mulai kami pantau:</p><ul>" + "".join(_baris_harga(i) for i in termurah[:MAKS_BARIS_LAPORAN]) + "</ul>")
@@ -130,8 +146,11 @@ def _tulis_laporan(senin, minggu, turun, naik, termurah):
         bagian.append("<h2>Naik harga (diskon berakhir)</h2><p>Kalau salah satunya ada di daftar incaranmu, "
                       "pasang alarm supaya dikabari saat diskon lagi.</p><ul>"
                       + "".join(_baris_harga(i) for i in naik[:MAKS_BARIS_LAPORAN]) + "</ul>")
-    bagian.append('<p>Harga diambil langsung dari Steam region Indonesia setiap sore. Riwayat lengkap setiap game '
-                  'bisa dilihat di <a href="/game/">daftar game</a>.</p>')
+    bagian.append("<h2>Cara membaca laporan ini</h2><p>Laporan ini membandingkan harga setiap game pada akhir pekan ini "
+                  "dengan harga pada akhir pekan sebelumnya. Harga diambil langsung dari Steam region Indonesia setiap sore, "
+                  "jadi angka di sini adalah harga Rupiah yang benar-benar kamu bayar, bukan hasil konversi dolar. "
+                  'Riwayat lengkap setiap game, termasuk harga termurah yang pernah tercatat, ada di <a href="/game/">daftar game</a>. '
+                  "Kalau ada game yang belum cukup murah, pasang alarm harga di bot Telegram kami supaya dikabari saat harganya turun.</p>")
     return {"slug": f"laporan-harga-{senin.isoformat()}", "judul": judul, "deskripsi": deskripsi,
             "tanggal": terbit.isoformat(), "jenis": "Laporan harga", "html": "\n".join(bagian), "otomatis": True}
 
@@ -164,7 +183,8 @@ def perbarui_epic_mendatang(session=None):
                     daftar.append({"judul": el["title"], "mulai": p["startDate"], "berakhir": p["endDate"],
                                    "dicatat": datetime.now(WIB).date().isoformat(),
                                    "url": f"https://store.epicgames.com/p/{slug}" if slug else "https://store.epicgames.com/free-games",
-                                   "gambar": gambar})
+                                   "gambar": gambar,
+                                   "deskripsi": (el.get("description") or "")[:300]})
     os.makedirs(os.path.dirname(FILE_EPIC), exist_ok=True)
     with open(FILE_EPIC, "w", encoding="utf-8") as f:
         json.dump(catatan, f, ensure_ascii=False, indent=1)
@@ -193,11 +213,22 @@ def tulisan_epic(catatan):
             gambar = (f'<img src="{escape(gambar_epic(g["gambar"]))}" alt="{escape(g["judul"])}" width="640" height="360" '
                       f'loading="lazy" decoding="async" style="width:100%;height:auto;border-radius:3px">'
                       if g["gambar"] else "")
-            item.append(f'<h2>{escape(g["judul"])}</h2>{gambar}<p>Gratis mulai <strong>{_waktu_wib(g["mulai"])}</strong> '
+            tentang = ""
+            if g.get("deskripsi") and g["deskripsi"].strip().lower() != g["judul"].strip().lower():
+                tentang = f'<p>Deskripsi dari Epic Games Store:</p><blockquote lang="en"><p>{escape(g["deskripsi"])}</p></blockquote>'
+            item.append(f'<h2>{escape(g["judul"])}</h2>{gambar}{tentang}<p>Gratis mulai <strong>{_waktu_wib(g["mulai"])}</strong> '
                         f'sampai <strong>{_waktu_wib(g["berakhir"])}</strong>. '
                         f'<a href="{escape(g["url"])}" rel="noopener">Halaman game di Epic</a>.</p>')
-        html = (f"<p>Epic Games Store sudah mengumumkan game gratis untuk minggu berikutnya. "
-                f"Sekali klaim, game jadi milikmu selamanya.</p>" + "".join(item)
+        hari_mulai = _waktu_wib(daftar[0]["mulai"])
+        html = (f"<p>Epic Games Store sudah mengumumkan game gratis untuk minggu berikutnya: <strong>{escape(gabung)}</strong>. "
+                f"Sekali klaim, game jadi milikmu selamanya, walaupun setelah promonya selesai harganya kembali normal. "
+                f"Klaim bisa dilakukan mulai {hari_mulai}.</p>" + "".join(item)
+                + "<h2>Cara klaim singkat</h2><ol>"
+                  "<li>Buka store.epicgames.com dan masuk ke akun Epic. Aktifkan autentikasi dua faktor (2FA) kalau belum.</li>"
+                  "<li>Cari game di bagian <strong>Free Games</strong> yang berlabel <strong>Free Now</strong>, lalu klik <strong>Get</strong>.</li>"
+                  "<li>Di jendela pembayaran, pastikan totalnya Rp 0, lalu klik <strong>Place Order</strong>. Tidak perlu kartu kredit.</li></ol>"
+                  "<p>Game tidak harus langsung diunduh. Yang penting diklaim sebelum batas waktunya, karena setelah itu "
+                  "game kembali berbayar dan Epic jarang menggratiskan game yang sama dua kali.</p>"
                 + '<p>Belum pernah klaim? Ikuti <a href="/panduan/cara-klaim-game-gratis-epic-games/">panduan '
                   'cara klaim game gratis Epic</a>. Saat game ini sudah bisa diklaim, kami kabari juga di channel Telegram. '
                   'Daftar yang selalu terbaru ada di halaman <a href="/game-gratis-epic/">game gratis Epic minggu ini</a>.</p>')
@@ -265,12 +296,21 @@ def _html_daftar(daftar, situs):
     badan = f"""    <nav class="jejak" aria-label="Lokasi halaman"><ol><li><a href="/">Beranda</a></li><li aria-current="page">Info Game</li></ol></nav>
     <div>
       <h1 class="judul-halaman">Info Game</h1>
-      <p class="catatan">Kabar seputar harga, sale, dan game gratis di Steam dan Epic untuk pemain di Indonesia. Laporan harga setiap Senin, kabar mingguan setiap Minggu. <a href="/info-game/feed.xml">RSS</a>.</p>
+      <div class="prosa">
+        <p>Info Game berisi kabar seputar harga, sale, dan game gratis di Steam dan Epic Games Store, khusus untuk pemain di Indonesia. Ada tiga jenis tulisan di sini:</p>
+        <ul>
+          <li><strong>Laporan harga mingguan</strong>, terbit setiap Senin. Isinya game yang turun harga, naik harga, dan yang sedang di harga termurahnya, dihitung dari pantauan harga harian kami dalam Rupiah.</li>
+          <li><strong>Game gratis Epic</strong>, terbit begitu Epic mengumumkan game gratis untuk minggu berikutnya, lengkap dengan jadwal klaim dalam WIB.</li>
+          <li><strong>Kabar mingguan</strong>, terbit setiap Minggu dan ditulis langsung oleh pengelola GameDiskon, berisi kabar game pilihan minggu itu beserta pendapat kami.</li>
+        </ul>
+        <p>Ikuti juga lewat <a href="/info-game/feed.xml">RSS</a> atau channel Telegram GameDiskon supaya tidak ketinggalan.</p>
+      </div>
       <ul class="daftar-artikel">{item}</ul>
     </div>"""
     return url, _kerangka("Info Game: Kabar Harga, Sale, dan Game Gratis",
                           "Kabar terbaru seputar harga game Steam Indonesia, jadwal sale, dan game gratis Epic.",
-                          url, badan, aktif="info-game").replace("</head>", f'<link rel="alternate" type="application/rss+xml" title="Info Game GameDiskon" href="{situs}info-game/feed.xml">\n</head>', 1)
+                          url, badan, aktif="info-game",
+                          jsonld={"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Beranda", "item": situs}, {"@type": "ListItem", "position": 2, "name": "Info Game", "item": url}]}).replace("</head>", f'<link rel="alternate" type="application/rss+xml" title="Info Game GameDiskon" href="{situs}info-game/feed.xml">\n</head>', 1)
 
 
 def _rss(daftar, situs):

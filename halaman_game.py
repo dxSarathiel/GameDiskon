@@ -14,6 +14,7 @@ import json
 import os
 import re
 import unicodedata
+import zlib
 from datetime import datetime
 from html import escape
 
@@ -84,6 +85,9 @@ def ringkas(appid, g):
         "tgl_terendah": entri_terendah[0],
         "diskon_terendah": entri_terendah[2],
         "pernah_berubah": len({e[1] for e in riwayat}) > 1,
+        "diskon_maks": max(e[2] for e in riwayat),
+        "jumlah_perubahan": len(riwayat) - 1,
+        "info": g.get("info") or {},
     }
 
 
@@ -121,10 +125,133 @@ def _jsonld_jejak(situs, nama, url):
 
 
 # ---------- Halaman satu game ----------
-def _html_game(r, situs, link_telegram, hari_ini):
+# ---------- Isi tambahan halaman game (supaya tiap halaman punya isi yang khas) ----------
+def _gabung(daftar):
+    daftar = [d for d in daftar if d]
+    if len(daftar) <= 1:
+        return "".join(daftar)
+    return ", ".join(daftar[:-1]) + " dan " + daftar[-1]
+
+
+_TETAP = {"Steam", "Remote", "Play", "Cloud", "Workshop", "Valve", "Anti-Cheat", "Early", "Access"}
+
+
+def _huruf_kecil(teks):
+    """'Pencapaian Steam' -> 'pencapaian Steam', 'RPG' tetap 'RPG' (nama dan singkatan dipertahankan)."""
+    return " ".join(w if (w in _TETAP or w.isupper()) else w.lower() for w in teks.split())
+
+
+def _bagian_tentang(r):
+    """Tentang game: kalimat Indonesia dari data toko Steam + deskripsi resmi + fakta."""
+    info, nama = r["info"], r["nama"]
+    if not (info.get("genre") or info.get("developer") or info.get("deskripsi")):
+        return ""
+    kalimat = f"{nama} adalah game"
+    if info.get("genre"):
+        kalimat += f" {_gabung([_huruf_kecil(g) for g in info['genre']])}"
+    if info.get("developer"):
+        kalimat += f" buatan {_gabung(info['developer'])}"
+    if info.get("publisher") and info.get("publisher") != info.get("developer"):
+        kalimat += f", diterbitkan oleh {_gabung(info['publisher'])}"
+    if info.get("rilis"):
+        kalimat += f", dirilis {info['rilis']}"
+    kalimat += "."
+    if info.get("fitur"):
+        kalimat += f" Fitur yang tercantum di Steam antara lain {_gabung([_huruf_kecil(f) for f in info['fitur'][:4]])}."
+    kutipan = (f'\n      <p>Deskripsi resmi di halaman Steam:</p>\n      <blockquote lang="en"><p>{escape(info["deskripsi"])}</p></blockquote>'
+               if info.get("deskripsi") else "")
+    fakta = [(k, v) for k, v in (("Genre", ", ".join(info.get("genre") or [])),
+                                 ("Developer", ", ".join(info.get("developer") or [])),
+                                 ("Publisher", ", ".join(info.get("publisher") or [])),
+                                 ("Tanggal rilis", info.get("rilis") or "")) if v]
+    dl = "".join(f"<div><dt>{escape(k)}</dt><dd>{escape(v)}</dd></div>" for k, v in fakta)
+    return f"""
+    <section class="bagian" aria-labelledby="h-tentang">
+      <h2 id="h-tentang">Tentang {escape(nama)}</h2>
+      <div class="prosa">
+      <p>{escape(kalimat)}</p>{kutipan}
+      </div>
+      <dl class="fakta">{dl}</dl>
+    </section>"""
+
+
+def _bagian_ringkasan(r, hari_ini):
+    """Ringkasan riwayat harga dalam kalimat, dihitung dari data pantauan sendiri."""
+    nama, kini, normal = r["nama"], r["harga_kini"], r["normal"]
+    hari = max(1, _hari_sejak(r["mulai"], hari_ini))
+    p = [f"Kami memantau harga {nama} di Steam Indonesia setiap hari sejak {_tgl(r['mulai'])} ({hari} hari)."]
+    if r["jumlah_perubahan"] == 0:
+        p.append(f"Selama itu harganya belum pernah berubah, tetap {_rupiah(kini)}"
+                 + (f" (diskon {r['diskon_kini']}% dari harga normal {_rupiah(normal)})." if r["diskon_kini"] and normal else "."))
+    else:
+        p.append(f"Dalam periode itu harganya berubah {r['jumlah_perubahan']} kali.")
+        if r["diskon_maks"]:
+            p.append(f"Diskon terbesar yang pernah tercatat adalah {r['diskon_maks']}%.")
+        p.append(f"Harga termurahnya {_rupiah(r['harga_terendah'])} pada {_tgl(r['tgl_terendah'])}.")
+        if kini <= r["harga_terendah"]:
+            p.append("Harga hari ini sama dengan harga termurah itu, jadi ini saat yang baik untuk membeli.")
+        else:
+            selisih = kini - r["harga_terendah"]
+            p.append(f"Harga hari ini masih {_rupiah(selisih)} lebih mahal dari harga termurahnya.")
+    if hari < 60:
+        p.append("Riwayat ini masih pendek. Makin lama dipantau, makin jelas pola diskonnya, misalnya seberapa besar potongan saat Steam Sale.")
+    return f"""
+    <section class="bagian prosa" aria-labelledby="h-ringkas">
+      <h2 id="h-ringkas">Ringkasan harga {escape(nama)}</h2>
+      <p>{escape(" ".join(p))}</p>
+    </section>"""
+
+
+def _bagian_tanya(r):
+    nama, kini = r["nama"], r["harga_kini"]
+    if r["diskon_kini"]:
+        j1 = f"Ya. Hari ini {nama} diskon {r['diskon_kini']}% di Steam Indonesia, menjadi {_rupiah(kini)}."
+    else:
+        j1 = f"Tidak. Hari ini {nama} dijual dengan harga normal {_rupiah(kini)} di Steam Indonesia."
+    j2 = (f"Harga termurah yang pernah kami catat adalah {_rupiah(r['harga_terendah'])}"
+          + (f" (diskon {r['diskon_terendah']}%)" if r["diskon_terendah"] else "") + f", pada {_tgl(r['tgl_terendah'])}.")
+    j3 = ("Tidak ada yang tahu pasti, karena developer menentukan sendiri jadwal diskonnya. "
+          "Diskon besar biasanya muncul saat Steam Sale musiman. Lihat jadwalnya di halaman Jadwal Steam Sale, "
+          "atau pasang alarm harga supaya dikabari begitu harganya turun.")
+    tanya = [(f"Apakah {nama} sedang diskon di Steam?", j1),
+             (f"Berapa harga termurah {nama} di Steam Indonesia?", j2),
+             (f"Kapan {nama} diskon lagi?", j3)]
+    isi = "".join(f"<details><summary>{escape(t)}</summary><p>{escape(j)}</p></details>" for t, j in tanya)
+    return f"""
+    <section class="bagian" aria-labelledby="h-tanya">
+      <h2 id="h-tanya">Pertanyaan seputar harga {escape(nama)}</h2>
+      <div class="tanya">{isi}</div>
+      <p class="catatan">Jadwal sale berikutnya: <a href="/jadwal-steam-sale/">Jadwal Steam Sale</a>.</p>
+    </section>"""
+
+
+def _pilih_terkait(r, aktif, jumlah=6):
+    """Game lain yang sedang diskon: utamakan yang genrenya sama, lalu diskon terbesar."""
+    genre = set(r["info"].get("genre") or [])
+    kandidat = [x for x in aktif if x["appid"] != r["appid"]]
+    kandidat.sort(key=lambda x: (-len(genre & set(x["info"].get("genre") or [])), -x["diskon_kini"],
+                                 zlib.crc32(f"{r['appid']}-{x['appid']}".encode())))   # urutan tetap, bukan acak tiap run
+    return kandidat[:jumlah]
+
+
+def _bagian_terkait(r, aktif):
+    terkait = _pilih_terkait(r, aktif)
+    if not terkait:
+        return ""
+    item = "".join(f'<li><a href="/{jalur_game(x["appid"], x["slug"])}">{escape(x["nama"])}</a>'
+                   f'<span class="harga"><b>-{x["diskon_kini"]}%</b>{_rupiah(x["harga_kini"])}</span></li>' for x in terkait)
+    return f"""
+    <section class="bagian" aria-labelledby="h-terkait">
+      <h2 id="h-terkait">Game lain yang sedang diskon</h2>
+      <ul class="daftar">{item}</ul>
+      <p class="catatan"><a href="/game/">Lihat semua game yang dipantau</a></p>
+    </section>"""
+
+
+def _html_game(r, situs, link_telegram, hari_ini, aktif=()):
     url = situs + jalur_game(r["appid"], r["slug"])
     nama = r["nama"]
-    gambar = f"https://cdn.akamai.steamstatic.com/steam/apps/{r['appid']}/header.jpg"
+    gambar = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{r['appid']}/header.jpg"
     toko = f"https://store.steampowered.com/app/{r['appid']}/"
     kini, normal, diskon = r["harga_kini"], r["normal"], r["diskon_kini"]
 
@@ -198,7 +325,7 @@ def _html_game(r, situs, link_telegram, hari_ini):
       <div><dt>Harga normal</dt><dd>{fakta_normal}</dd></div>
       <div><dt>Termurah tercatat</dt><dd>{fakta_terendah}</dd></div>
       <div><dt>Dipantau sejak</dt><dd>{_tgl(r['mulai'])}</dd></div>
-    </dl>{blok_halaman_game(kini)}
+    </dl>{_bagian_ringkasan(r, hari_ini)}{blok_halaman_game(kini)}{_bagian_tentang(r)}
     <section class="struk" aria-labelledby="h-riwayat">
       <h2 id="h-riwayat">Riwayat harga</h2>
       <p class="catatan">Setiap baris adalah hari ketika harganya berubah. Dicek setiap hari.</p>
@@ -207,7 +334,7 @@ def _html_game(r, situs, link_telegram, hari_ini):
         <tbody>{"".join(baris)}</tbody>
         <tfoot><tr><td colspan="2">Termurah tercatat</td><td class="angka">{_rupiah(r['harga_terendah'])}</td></tr></tfoot>
       </table>
-    </section>"""
+    </section>{_bagian_tanya(r)}{_bagian_terkait(r, aktif)}"""
     noindex = _hari_sejak(r["mulai"], hari_ini) < MIN_HARI_INDEKS
     return url, _kerangka(judul, deskripsi, url, isi, og_gambar=gambar, noindex=noindex,
                           jsonld=_jsonld_jejak(situs, nama, url), aktif="game"), noindex
@@ -254,7 +381,8 @@ def _html_daftar(semua, situs):
     </label>
     <p class="hasil-saring" aria-live="polite"></p>
     <ul class="daftar">{"".join(item)}</ul>"""
-    return url, _kerangka(judul, deskripsi, url, isi, aktif="game", script=SKRIP_CARI)
+    return url, _kerangka(judul, deskripsi, url, isi, aktif="game", script=SKRIP_CARI,
+                          jsonld={"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Beranda", "item": situs}, {"@type": "ListItem", "position": 2, "name": "Semua game", "item": url}]})
 
 
 # ---------- Titik masuk ----------
@@ -297,10 +425,13 @@ def buat_halaman_game(riwayat, folder="docs", link_telegram=""):
     semua, untuk_sitemap, jumlah_berubah = [], [], 0
     for appid, g in riwayat.items():
         r = ringkas(appid, g)
-        if not r:
-            continue
-        semua.append(r)
-        url, html, noindex = _html_game(r, situs, link_telegram, hari_ini)
+        if r:
+            semua.append(r)
+    # Game yang sedang diskon dan masih dicek harian, untuk bagian "Game lain yang sedang diskon"
+    aktif = [r for r in semua if r["diskon_kini"] > 0 and _hari_sejak(r["cek"], hari_ini) <= BATAS_TIDAK_DIPANTAU]
+    for r in semua:
+        appid = r["appid"]
+        url, html, noindex = _html_game(r, situs, link_telegram, hari_ini, aktif)
         path = os.path.join(folder, jalur_game(appid, r["slug"]), "index.html")
         jumlah_berubah += _tulis_jika_berubah(path, html)
         if not noindex:

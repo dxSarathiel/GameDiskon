@@ -82,7 +82,7 @@ def _unduh(url, session=None):
 def _sampul_steam(appid, session=None):
     """Sampul resolusi lebih besar dulu, lalu yang standar."""
     for nama in ("capsule_616x353.jpg", "header.jpg"):
-        img = _unduh(f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/{nama}", session)
+        img = _unduh(f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/{nama}", session)
         if img:
             return img
     return None
