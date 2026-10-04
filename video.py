@@ -6,12 +6,16 @@ Tampilannya sama dengan situs: pita biru, label harga kuning, potongan merah.
 Selain video, dibuat juga naskah untuk suara TTS, judul, dan tagar yang siap disalin.
 
 Butuh: Pillow dan imageio-ffmpeg (ffmpeg ikut terpasang lewat pip, tidak perlu apt).
+Video animasi (utama) butuh Node.js 22+ dan ffmpeg/ffprobe di PATH; lihat video_hf/README.md.
+Kalau tidak tersedia, otomatis memakai video slide Pillow.
 """
 
 import os
 import random
 import re
 import subprocess
+import time
+import wave
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
@@ -415,7 +419,156 @@ def rakit_mp4(slide, path_mp4, folder_kerja):
     return total
 
 
-# ---------- Teks pendamping ----------
+# ---------- Rakit video dengan HyperFrames (animasi) ----------
+# Template animasi ada di folder video_hf/ (lihat video_hf/rakit.py). Kalau langkah mana pun
+# gagal, buat_video() kembali ke rakit_mp4() di atas, jadi posting harian tidak terlewat.
+# Set VIDEO_HYPERFRAMES=0 untuk mematikan jalur ini tanpa mengubah kode.
+FOLDER_HF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "video_hf")
+BATAS_RENDER = 900            # detik; render di runner GitHub biasanya beberapa menit
+
+
+def _muat_rakit():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("rakit_hf", os.path.join(FOLDER_HF, "rakit.py"))
+    modul = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modul)
+    return modul
+
+
+def _hf_siap():
+    """Pastikan alat render ada. Kembalikan path npm, atau lempar RuntimeError."""
+    import shutil
+    npm = shutil.which("npm")
+    if not npm:
+        raise RuntimeError("npm (Node.js) tidak ditemukan")
+    for alat in ("ffmpeg", "ffprobe"):
+        if not shutil.which(alat):
+            raise RuntimeError(f"{alat} tidak ada di PATH")
+    return npm
+
+
+# ---------- Suara TTS otomatis (ElevenLabs) ----------
+# Aktif kalau secret ELEVENLABS_API_KEY tersedia. Suara bawaan: Iwan (bahasa Indonesia).
+# Ganti suara lewat ELEVENLABS_VOICE_ID tanpa mengubah kode. Biaya kira-kira 1 kredit per huruf naskah.
+SUARA_BAWAAN = "1kNciG1jHVSuFBPoxdRZ"       # "Iwan - Informative, Authentic and Clear"
+MODEL_TTS = "eleven_multilingual_v2"
+RAPIKAN_SUARA = ("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03,areverse,"
+                 "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03,areverse,"
+                 "loudnorm=I=-15:TP=-1.5:LRA=11")
+
+
+def _teks_tts(teks):
+    """'40,000' dibaca '40 koma 000' oleh TTS bahasa Indonesia; jadikan '40.000' (empat puluh ribu)."""
+    return re.sub(r"(?<=\d),(?=\d{3}\b)", ".", teks)
+
+
+def _tts_elevenlabs(teks, api_key, voice_id, session=None):
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128"
+    for coba in range(3):
+        r = (session or requests).post(url, timeout=90,
+                                       headers={"xi-api-key": api_key, "accept": "audio/mpeg"},
+                                       json={"text": teks, "model_id": MODEL_TTS})
+        if r.status_code == 429 and coba < 2:      # batas proses bersamaan: tunggu, coba lagi
+            time.sleep(4 * (coba + 1))
+            continue
+        r.raise_for_status()
+        return r.content
+
+
+def buat_suara(segmen, ada_gratis, session=None):
+    """Satu klip per adegan, dibuat berurutan. Hening di awal/akhir dipotong dan keras disamakan.
+    Kembalikan {"pembuka": {file, durasi}, "game": [...], "gratis": ..., "penutup": ...},
+    atau None kalau ELEVENLABS_API_KEY tidak diset. Melempar exception kalau API gagal."""
+    import shutil
+    api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
+    if not api_key:
+        return None
+    voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "").strip() or SUARA_BAWAAN
+    folder = os.path.join(FOLDER_HF, "assets", "suara")
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+
+    def satu(nama, teks):
+        mp3, wav = os.path.join(folder, nama + ".mp3"), os.path.join(folder, nama + ".wav")
+        with open(mp3, "wb") as f:
+            f.write(_tts_elevenlabs(_teks_tts(teks), api_key, voice_id, session))
+        subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", mp3, "-af", RAPIKAN_SUARA,
+                        "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", wav], check=True)
+        os.remove(mp3)
+        with wave.open(wav) as w:
+            durasi = w.getnframes() / w.getframerate()
+        return {"file": f"assets/suara/{nama}.wav", "durasi": round(durasi, 3)}
+
+    suara = {"pembuka": satu("pembuka", segmen["pembuka"]),
+             "game": [satu(f"game-{i}", t) for i, t in enumerate(segmen["game"], 1)],
+             "gratis": satu("gratis", segmen["gratis"]) if ada_gratis and segmen["gratis"] else None,
+             "penutup": satu("penutup", segmen["penutup"])}
+    huruf = sum(len(t) for t in [segmen["pembuka"], *segmen["game"], segmen["penutup"]]
+                + ([segmen["gratis"]] if suara["gratis"] else []))
+    print(f"Suara TTS siap ({voice_id}, sekitar {huruf} kredit).")
+    return suara
+
+
+def rakit_mp4_hyperframes(steam, epic, segmen, sekarang, username_bot, link_channel, path_mp4, session=None, suara=None):
+    """Isi template HyperFrames dengan data hari ini (dan suara TTS bila ada), lalu render.
+    Kembalikan (durasi, dengan_suara). Melempar exception kalau ada yang gagal."""
+    import shutil
+    npm = _hf_siap()
+
+    # Sampul diunduh dulu: saat render tidak boleh ada unduhan dari jaringan
+    folder_sampul = os.path.join(FOLDER_HF, "assets", "sampul")
+    shutil.rmtree(folder_sampul, ignore_errors=True)
+    os.makedirs(folder_sampul)
+
+    def simpan(img, nama):
+        if not img:
+            return ""
+        img.save(os.path.join(folder_sampul, nama), "JPEG", quality=90)
+        return f"assets/sampul/{nama}"
+
+    data_steam = []
+    for i, g in enumerate(steam, 1):
+        appid = re.search(r"/app/(\d+)", g["url"])
+        data_steam.append({
+            "judul": g["judul"], "rating": g["rating"], "diskon": g["diskon"],
+            "harga_awal": g["harga_awal"], "harga_akhir": g["harga_akhir"],
+            "terendah_sejak": g.get("terendah_sejak"),
+            "sampul": simpan(_sampul_steam(appid.group(1), session) if appid else None, f"steam-{i}.jpg"),
+        })
+    data_epic = []
+    if epic:
+        g = epic[0]
+        data_epic.append({"judul": g["judul"], "berakhir": g["berakhir"],
+                          "gambar": simpan(_unduh(g["gambar"], session) if g.get("gambar") else None, "epic.jpg")})
+
+    data = {"tanggal": sekarang.date().isoformat(), "username_bot": username_bot, "link_channel": link_channel,
+            "steam": data_steam, "epic": data_epic,
+            "naskah": {"pembuka": segmen["pembuka"], "game": segmen["game"],
+                       "gratis": segmen["gratis"], "penutup": segmen["penutup"]},
+            "suara": suara}
+    hasil = _muat_rakit().rakit(data, FOLDER_HF)
+
+    # Render memakai versi CLI yang dikunci di video_hf/package.json
+    sementara = os.path.join(FOLDER_HF, "renders", "harian.mp4")
+    os.makedirs(os.path.dirname(sementara), exist_ok=True)
+    if os.path.exists(sementara):
+        os.remove(sementara)
+    subprocess.run([npm, "run", "render", "--", "-f", str(FPS), "-o", sementara, "--quiet"],
+                   cwd=FOLDER_HF, check=True, timeout=BATAS_RENDER)
+
+    if hasil["dengan_suara"]:
+        # Suara sudah dicampur oleh HyperFrames; cukup pindahkan indeks ke depan untuk unggahan
+        subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", sementara, "-c", "copy",
+                        "-movflags", "+faststart", path_mp4], check=True)
+    else:
+        # Trek audio hening (sama seperti jalur lama), supaya aman diunggah ke TikTok/Shorts
+        subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", sementara,
+                        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                        "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "64k",
+                        "-shortest", "-movflags", "+faststart", path_mp4], check=True)
+    return hasil["durasi"], hasil["dengan_suara"]
+
+
 # ---------- Naskah suara dan teks pendamping ----------
 # Naskah ditulis seperti orang ngobrol: kalimat pendek-panjang bergantian, ada reaksi,
 # pertanyaan, dan jeda (koma, titik, tanda tanya, tanda seru) supaya TTS membacanya dengan ekspresi.
@@ -594,7 +747,7 @@ def _lama(teks, minimal, maksimal):
 
 def buat_video(steam, epic, path_mp4="video_harian.mp4", username_bot="", link_channel="", session=None):
     """Buat video + teks pendamping. steam/epic: daftar deal dari radar_diskon.py.
-    Kembalikan dict {path, durasi, naskah, judul, keterangan, tagar}, atau None kalau datanya kurang."""
+    Kembalikan dict {path, durasi, naskah, judul, keterangan, tagar, dengan_suara}, atau None kalau datanya kurang."""
     steam = steam[:MAKS_GAME]
     if len(steam) < 2:
         print("Video dilewati: diskon Steam kurang dari 2.")
@@ -603,17 +756,33 @@ def buat_video(steam, epic, path_mp4="video_harian.mp4", username_bot="", link_c
     sekarang = datetime.now(WIB)
     segmen, acak = susun_teks(steam, epic, sekarang)
 
-    # Lama tiap slide mengikuti panjang kalimatnya, supaya suara TTS pas dengan gambar
-    slide = [(slide_pembuka(len(steam), sekarang, bool(epic)), _lama(segmen["pembuka"], 2.4, 4.5))]
-    for i, (g, teks) in enumerate(zip(steam, segmen["game"]), 1):
-        slide.append((slide_game(g, i, len(steam), session), _lama(teks, 2.6, 6.0)))
-    if epic:
-        slide.append((slide_gratis(epic[0], session), _lama(segmen["gratis"], 3.0, 6.5)))
-    slide.append((slide_penutup(username_bot, link_channel), _lama(segmen["penutup"], 3.4, 7.0)))
-    durasi = rakit_mp4(slide, path_mp4, "video_kerja")
+    # Utama: video animasi HyperFrames (+ suara TTS bila ada API key). Cadangan: slide Pillow tanpa suara.
+    durasi, dengan_suara = None, False
+    if os.environ.get("VIDEO_HYPERFRAMES", "1") != "0":
+        try:
+            _hf_siap()                 # cek alat dulu supaya kredit TTS tidak terpakai sia-sia
+            suara = None
+            try:
+                suara = buat_suara(segmen, bool(epic), session)
+            except Exception as e:
+                print(f"Suara TTS gagal, video dibuat tanpa suara: {e}")
+            durasi, dengan_suara = rakit_mp4_hyperframes(steam, epic, segmen, sekarang, username_bot,
+                                                         link_channel, path_mp4, session, suara)
+            print(f"Video HyperFrames selesai ({durasi:.1f} detik, {'dengan' if dengan_suara else 'tanpa'} suara).")
+        except Exception as e:
+            print(f"HyperFrames gagal, pakai video slide biasa: {e}")
+    if durasi is None:
+        # Lama tiap slide mengikuti panjang kalimatnya, supaya suara TTS pas dengan gambar
+        slide = [(slide_pembuka(len(steam), sekarang, bool(epic)), _lama(segmen["pembuka"], 2.4, 4.5))]
+        for i, (g, teks) in enumerate(zip(steam, segmen["game"]), 1):
+            slide.append((slide_game(g, i, len(steam), session), _lama(teks, 2.6, 6.0)))
+        if epic:
+            slide.append((slide_gratis(epic[0], session), _lama(segmen["gratis"], 3.0, 6.5)))
+        slide.append((slide_penutup(username_bot, link_channel), _lama(segmen["penutup"], 3.4, 7.0)))
+        durasi = rakit_mp4(slide, path_mp4, "video_kerja")
 
     urutan = [segmen["pembuka"], *segmen["game"]] + ([segmen["gratis"]] if epic else []) + [segmen["penutup"]]
     judul, keterangan, tagar = susun_pendamping(steam, epic, sekarang, username_bot, acak)
     hasil = {"naskah": "\n\n".join(urutan), "judul": judul, "keterangan": keterangan, "tagar": tagar,
-             "path": path_mp4, "durasi": durasi}
+             "path": path_mp4, "durasi": durasi, "dengan_suara": dengan_suara}
     return hasil
