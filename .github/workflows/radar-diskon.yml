@@ -20,11 +20,23 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # Untuk video animasi HyperFrames (video_hf/). Kalau salah satu tidak tersedia,
+      # video.py otomatis memakai video slide biasa, jadi radar tetap jalan.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Pasang FFmpeg untuk render video
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
       - name: Jalankan radar
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_OWNER_ID: ${{ secrets.TELEGRAM_OWNER_ID }}
+          # Suara TTS otomatis untuk video (opsional; tanpa secret ini video tetap dibuat tanpa suara)
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}   # kosong = suara Iwan
         run: python radar_diskon.py
 
       - name: Simpan catatan deal dan riwayat harga
