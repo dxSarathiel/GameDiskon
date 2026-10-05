@@ -1,0 +1,77 @@
+name: Perbarui HyperFrames
+
+# Seminggu sekali: kalau ada versi CLI HyperFrames yang lebih baru, naikkan versi yang dikunci di
+# video_hf/package.json, rakit video contoh, dan jalankan `hyperframes check`. Versi baru hanya
+# disimpan ke repo kalau verifikasinya lolos; kalau gagal, bot tetap memakai versi lama.
+on:
+  schedule:
+    - cron: "23 1 * * 1"    # Senin 01:23 UTC = 08:23 WIB, jauh dari jadwal radar (17:17 WIB)
+  workflow_dispatch:         # tombol "Run workflow" untuk tes manual
+
+permissions:
+  contents: write            # perlu untuk menyimpan versi baru ke repo
+
+jobs:
+  perbarui:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Cek versi terbaru
+        id: cek
+        working-directory: video_hf
+        run: |
+          LAMA=$(grep -oE 'hyperframes@[0-9]+\.[0-9]+\.[0-9]+' package.json | head -1 | cut -d@ -f2)
+          BARU=$(npm view hyperframes version)
+          echo "lama=$LAMA" >> "$GITHUB_OUTPUT"
+          echo "baru=$BARU" >> "$GITHUB_OUTPUT"
+          if [ "$LAMA" = "$BARU" ]; then echo "ada=tidak" >> "$GITHUB_OUTPUT"; else echo "ada=ya" >> "$GITHUB_OUTPUT"; fi
+          echo "HyperFrames terpasang $LAMA, terbaru $BARU"
+
+      - name: Naikkan versi
+        if: steps.cek.outputs.ada == 'ya'
+        working-directory: video_hf
+        run: npx --yes hyperframes@latest upgrade --project .
+
+      - name: Verifikasi dengan video contoh
+        if: steps.cek.outputs.ada == 'ya'
+        working-directory: video_hf
+        run: |
+          python3 rakit.py data-contoh.json
+          npm run check
+
+      - name: Simpan versi baru ke repo
+        if: steps.cek.outputs.ada == 'ya'
+        run: |
+          git config user.name "radar-bot"
+          git config user.email "radar-bot@users.noreply.github.com"
+          git add video_hf/package.json
+          git diff --cached --quiet || (git commit -m "HyperFrames ${{ steps.cek.outputs.lama }} -> ${{ steps.cek.outputs.baru }}" && git pull --rebase && git push)
+
+      - name: Kabari pemilik (berhasil)
+        if: success() && steps.cek.outputs.ada == 'ya'
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          PEMILIK: ${{ secrets.TELEGRAM_OWNER_ID }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$PEMILIK" ]; then exit 0; fi
+          curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$PEMILIK" \
+            --data-urlencode "text=✅ HyperFrames diperbarui ${{ steps.cek.outputs.lama }} → ${{ steps.cek.outputs.baru }} (verifikasi lolos). Video besok memakai versi baru." > /dev/null
+
+      - name: Kabari pemilik kalau gagal
+        if: failure()
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          PEMILIK: ${{ secrets.TELEGRAM_OWNER_ID }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$PEMILIK" ]; then exit 0; fi
+          LOG="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$PEMILIK" \
+            --data-urlencode "disable_web_page_preview=true" \
+            --data-urlencode "text=⚠️ Pembaruan HyperFrames ${{ steps.cek.outputs.lama }} → ${{ steps.cek.outputs.baru }} gagal verifikasi. Video harian tetap memakai versi ${{ steps.cek.outputs.lama }}. Log: $LOG" > /dev/null
