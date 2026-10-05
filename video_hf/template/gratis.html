@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head><meta charset="UTF-8"></head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: "Archivo"; src: url(assets/fonts/archivo-latin.woff2) format("woff2"); font-weight: 100 900; font-stretch: 62% 125%;
+          unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: "Archivo"; src: url(assets/fonts/archivo-latin-ext.woff2) format("woff2"); font-weight: 100 900; font-stretch: 62% 125%;
+          unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2C60-2C7F, U+A720-A7FF; }
+        #{{ID}} { position: absolute; inset: 0; overflow: hidden; color: #eef1f7; font-family: "Archivo", system-ui, sans-serif; }
+        /* cahaya magenta menimpa cahaya ungu latar: tanda ganti topik */
+        #{{ID}}-glow { position: absolute; left: 260px; top: -480px; width: 1320px; height: 1320px; display: block; border-radius: 50%;
+          background: radial-gradient(closest-side, rgba(255, 77, 141, 0.5), rgba(255, 77, 141, 0)); opacity: 0; }
+        #{{ID}} .stack { position: absolute; inset: 0; padding: 110px 54px 330px; display: flex; flex-direction: column; justify-content: center; }
+        #{{ID}}-kicker { margin-bottom: 34px; font-size: 40px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #ff4d8d; opacity: 0; }
+        #{{ID}} .cwrap { position: relative; }
+        #{{ID}}-card { position: relative; border-radius: 40px; background: #121722; border: 3px solid #5a2840; overflow: hidden; }
+        #{{ID}} .cover { position: relative; height: 545px; overflow: hidden; }
+        #{{ID}}-img { position: absolute; inset: -30px; display: block; background-size: cover; background-position: center; }
+        #{{ID}} .body { padding: 50px 100px 60px 54px; display: flex; flex-direction: column; }
+        #{{ID}}-nama { font-size: 82px; font-weight: 800; line-height: 1.06; opacity: 0;
+          display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        #{{ID}}-ket { margin-top: 36px; font-size: 46px; color: #9ba5ba; opacity: 0; }
+        #{{ID}} .batas-wrap { position: relative; align-self: flex-start; margin-top: 46px; padding: 0 30px; }
+        #{{ID}}-batas { display: block; font-size: 108px; font-weight: 900; font-stretch: 75%; line-height: 1.1; color: #ff4d8d; font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0; }
+        #{{ID}} .ring { position: absolute; left: -2%; top: -24%; width: 104%; height: 148%; overflow: visible; }
+        #{{ID}}-ring { fill: none; stroke: #ffd23f; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; }
+        #{{ID}}-milik { margin-top: 44px; font-size: 44px; opacity: 0; }
+        #{{ID}} .stamp-rot { position: absolute; left: 34px; top: 36px; transform: rotate(-8deg); }
+        #{{ID}}-stamp { display: block; font-size: 74px; font-weight: 900; padding: 20px 46px; border-radius: 999px; background: #ff4d8d; color: #0a0d13;
+          box-shadow: 0 0 48px rgba(255, 77, 141, 0.55); opacity: 0; }
+      </style>
+
+      <div id="{{ID}}" data-composition-id="{{ID}}" data-width="1080" data-height="1920">
+        <div id="{{ID}}-glow" data-layout-allow-overflow=""></div>
+        <div class="stack">
+          <div id="{{ID}}-kicker">Gratis di Epic Games Store</div>
+          <div class="cwrap">
+            <div id="{{ID}}-card">
+              <div class="cover"><div id="{{ID}}-img" data-layout-allow-overflow="" style="background-image: url('{{GAMBAR}}')"></div></div>
+              <div class="body">
+                <div id="{{ID}}-nama">{{JUDUL}}</div>
+                <div id="{{ID}}-ket">Klaim sebelum</div>
+                <div class="batas-wrap">
+                  <div id="{{ID}}-batas">{{BERAKHIR}}</div>
+                  <svg class="ring" viewBox="0 0 760 190" preserveAspectRatio="none"><path id="{{ID}}-ring" pathLength="1" d="M600 16 C700 24 752 58 748 98 C744 150 590 182 380 184 C180 186 18 164 12 104 C6 52 150 14 330 10 C460 7 590 10 690 34" /></svg>
+                </div>
+                <div id="{{ID}}-milik">Sekali klaim, jadi milikmu selamanya.</div>
+              </div>
+            </div>
+            <div class="stamp-rot"><div id="{{ID}}-stamp">GRATIS</div></div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          const D = {{DATA}};
+          const P = "#{{ID}}-";
+          const tl = gsap.timeline({ paused: true });
+          const m = D.mulai;
+
+          // Ganti topik: cahaya magenta mekar (ambient-glow-bloom), lalu bernapas terbatas
+          tl.fromTo(P + "glow", { opacity: 0, scale: 0.85 }, { opacity: 0.9, scale: 1, duration: 0.9, ease: "power2.out" }, 0);
+          const g = document.querySelector(P + "glow");
+          const fase = { p: 0 };
+          tl.to(fase, { p: Math.PI * 2, duration: Math.max(1, D.durasi - 0.9), ease: "none",
+            onUpdate: () => { const s = Math.sin(fase.p); g.style.transform = `scale(${1 + s * 0.05})`; } }, 0.9);
+
+          tl.fromTo(P + "img", { scale: 1, y: 14 }, { scale: 1.06, y: -14, duration: D.durasi, ease: "none" }, 0);
+          tl.fromTo(P + "kicker", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.4, ease: "power3.out" }, m);
+
+          tl.set(P + "nama", { opacity: 1, y: 50 }, m + 0.2);
+          tl.to(P + "nama", { y: 0, duration: 0.2, ease: "power4.out" }, m + 0.2);
+
+          // Stempel GRATIS dibanting: dari besar ke ukuran, power4 (hantaman, bukan pantulan)
+          const ts = m + 0.5;
+          tl.fromTo(P + "stamp", { scale: 2.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.32, ease: "power4.in" }, ts);
+          tl.fromTo(P + "card", { y: 0 }, { y: 10, duration: 0.07, ease: "power2.out" }, ts + 0.32);
+          tl.to(P + "card", { y: 0, duration: 0.35, ease: "power3.out" }, ts + 0.39);
+
+          tl.fromTo(P + "ket", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, m + 0.95);
+          tl.set(P + "batas", { opacity: 1, y: 45 }, m + 1.1);
+          tl.to(P + "batas", { y: 0, duration: 0.18, ease: "power4.out" }, m + 1.1);
+          // Lingkaran spidol menggambar dirinya (svg-path-draw, pathLength=1)
+          tl.set(P + "ring", { opacity: 1 }, m + 1.4);
+          tl.fromTo(P + "ring", { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.6, ease: "power2.out" }, m + 1.4);
+          tl.fromTo(P + "milik", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, m + 1.9);
+
+          window.__timelines["{{ID}}"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head><meta charset="UTF-8"></head>
+  <body>
+    <template>
+      <style>
+        /* Latar bersama untuk seluruh video: tetap di tempat saat adegan berganti,
+           jadi swipe terasa bergerak di atas satu dunia yang sama */
+        #latar { position: absolute; inset: 0; overflow: hidden; background: #0a0d13; }
+        #latar-a, #latar-b { position: absolute; display: block; border-radius: 50%; will-change: transform, opacity; }
+        #latar-a { left: 300px; top: -420px; width: 1240px; height: 1240px; background: radial-gradient(closest-side, rgba(123, 97, 255, 0.55), rgba(123, 97, 255, 0)); }
+        #latar-b { left: -560px; top: 1300px; width: 1240px; height: 1240px; background: radial-gradient(closest-side, rgba(184, 242, 41, 0.2), rgba(184, 242, 41, 0)); }
+        #latar-hud { position: absolute; left: 0; top: -90px; width: 1080px; height: 2010px; display: block;
+          background-image: linear-gradient(rgba(255, 255, 255, 0.05) 2px, transparent 2px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 2px, transparent 2px);
+          background-size: 45px 45px;
+          -webkit-mask-image: linear-gradient(#000, transparent 72%); mask-image: linear-gradient(#000, transparent 72%); }
+      </style>
+
+      <div id="latar" data-composition-id="latar" data-width="1080" data-height="1920">
+        <div id="latar-a" data-layout-allow-overflow=""></div>
+        <div id="latar-b" data-layout-allow-overflow=""></div>
+        <div id="latar-hud" data-layout-allow-overflow=""></div>
+      </div>
+
+      <script>
+        (function () {
+          const D = {{DATA}};
+          const tl = gsap.timeline({ paused: true });
+          // Cahaya bernapas: satu fase terbatas sepanjang video (sine-wave-loop / ambient-glow-bloom), bukan yoyo tak hingga
+          const ga = document.getElementById("latar-a");
+          const gb = document.getElementById("latar-b");
+          const fase = { p: 0 };
+          tl.fromTo(fase, { p: 0 }, {
+            p: Math.PI * 2 * Math.max(1, Math.round(D.durasi / 7)),
+            duration: D.durasi,
+            ease: "none",
+            onUpdate: () => {
+              const s = Math.sin(fase.p);
+              ga.style.transform = `translate(${s * 40}px, ${s * 24}px) scale(${1 + s * 0.06})`;
+              ga.style.opacity = String(0.9 + s * 0.1);
+              gb.style.transform = `translate(${-s * 30}px, ${-s * 20}px) scale(${1 - s * 0.05})`;
+            },
+          }, 0);
+          // Grid HUD bergeser pelan ke bawah (dua sel sepanjang video)
+          tl.fromTo("#latar-hud", { y: 0 }, { y: 90, duration: D.durasi, ease: "none" }, 0);
+          window.__timelines["latar"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

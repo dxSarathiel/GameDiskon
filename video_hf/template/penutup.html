@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head><meta charset="UTF-8"></head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: "Archivo"; src: url(assets/fonts/archivo-latin.woff2) format("woff2"); font-weight: 100 900; font-stretch: 62% 125%;
+          unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: "Archivo"; src: url(assets/fonts/archivo-latin-ext.woff2) format("woff2"); font-weight: 100 900; font-stretch: 62% 125%;
+          unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2C60-2C7F, U+A720-A7FF; }
+        #{{ID}} { position: absolute; inset: 0; overflow: hidden; color: #eef1f7; font-family: "Archivo", system-ui, sans-serif; }
+        #{{ID}} .abs { position: absolute; }
+        #{{ID}} .lime { color: #b8f229; }
+        #{{ID}}-logo { left: 72px; top: 300px; display: flex; align-items: center; gap: 22px; }
+        #{{ID}}-tag { display: block; width: 78px; height: 78px; overflow: visible; }
+        #{{ID}}-tagbox { transform-box: fill-box; transform-origin: 50% 50%; opacity: 0; }
+        #{{ID}}-tagpath { fill: none; stroke: #0a0d13; stroke-width: 2.4; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+        #{{ID}}-tagdot { transform-box: fill-box; transform-origin: 50% 50%; opacity: 0; }
+        #{{ID}} .wm { display: flex; font-size: 64px; font-weight: 900; font-stretch: 118%; letter-spacing: -0.005em; line-height: 1; }
+        #{{ID}} .wm span { display: inline-block; opacity: 0; }
+        #{{ID}}-judul { left: 72px; top: 500px; width: 860px; font-size: 114px; font-weight: 900; font-stretch: 118%; text-transform: uppercase; line-height: 0.98; letter-spacing: -0.005em; }
+        #{{ID}}-judul .ln { display: block; opacity: 0; }
+        #{{ID}} .btn-wrap { left: 72px; top: 990px; }
+        #{{ID}}-burst { position: absolute; inset: -40px; display: block; border-radius: 999px; background: radial-gradient(closest-side, rgba(184, 242, 41, 0.5), rgba(184, 242, 41, 0)); opacity: 0; }
+        #{{ID}}-btn { position: relative; display: block; font-size: 66px; font-weight: 900; padding: 26px 44px; border-radius: 999px; background: #b8f229; color: #0a0d13;
+          box-shadow: 0 0 44px rgba(184, 242, 41, 0.45); transform-origin: 50% 50%; opacity: 0; }
+        #{{ID}} .tg { left: 72px; opacity: 0; }
+        #{{ID}} .tg .ket { font-size: 46px; color: #9ba5ba; }
+        #{{ID}} .tg .isi { margin-top: 6px; font-size: 76px; font-weight: 900; font-stretch: 75%; color: #5cd2ff; }
+      </style>
+
+      <div id="{{ID}}" data-composition-id="{{ID}}" data-width="1080" data-height="1920">
+        <div class="abs" id="{{ID}}-logo">
+          <svg id="{{ID}}-tag" viewBox="0 0 24 24">
+            <rect id="{{ID}}-tagbox" width="24" height="24" rx="5.3" fill="#b8f229" />
+            <g transform="translate(4.56 4.56) scale(.62)">
+              <path id="{{ID}}-tagpath" pathLength="1" d="M3 3H13L20.6 10.6Q21.4 12 20.6 13.4L13.4 20.6Q12 21.4 10.6 20.6L3 13Z" />
+              <circle id="{{ID}}-tagdot" cx="7.5" cy="7.5" r="1.6" fill="#0a0d13" />
+            </g>
+          </svg>
+          <div class="wm"><span id="{{ID}}-w1">GAME</span><span id="{{ID}}-w2" class="lime">DISKON</span></div>
+        </div>
+        <div class="abs" id="{{ID}}-judul">
+          <span class="ln" id="{{ID}}-l1">Daftar</span>
+          <span class="ln" id="{{ID}}-l2">lengkap +</span>
+          <span class="ln" id="{{ID}}-l3">riwayat</span>
+          <span class="ln lime" id="{{ID}}-l4">harga</span>
+        </div>
+        <div class="abs btn-wrap"><div id="{{ID}}-burst"></div><div id="{{ID}}-btn">gamediskon.my.id</div></div>
+        {{TELEGRAM}}
+      </div>
+
+      <script>
+        (function () {
+          const D = {{DATA}};
+          const P = "#{{ID}}-";
+          const tl = gsap.timeline({ paused: true });
+          const m = D.mulai;
+
+          // Ikon tag: kotak lime pop, garis tag menggambar diri (svg-path-draw), titik muncul
+          tl.fromTo(P + "tagbox", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: "power3.out" }, m);
+          tl.fromTo(P + "tagpath", { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.55, ease: "power2.out" }, m + 0.2);
+          tl.fromTo(P + "tagdot", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "power3.out" }, m + 0.65);
+          tl.set(P + "w1", { opacity: 1, y: 45 }, m + 0.3);
+          tl.to(P + "w1", { y: 0, duration: 0.16, ease: "power4.out" }, m + 0.3);
+          tl.set(P + "w2", { opacity: 1, y: 45 }, m + 0.44);
+          tl.to(P + "w2", { y: 0, duration: 0.16, ease: "power4.out" }, m + 0.44);
+
+          // Judul waterfall, baris lime terakhir
+          let t = m + 0.7;
+          [["l1", 70, 0.18], ["l2", 50, 0.16], ["l3", 50, 0.15], ["l4", 75, 0.18]].forEach(([id, dy, d]) => {
+            tl.set(P + id, { opacity: 1, y: dy }, t);
+            tl.to(P + id, { y: 0, duration: d, ease: "power4.out" }, t);
+            t += d - 1 / 60;
+          });
+
+          // Tombol situs: pop, lalu ditekan sekali (press-release-spring)
+          const tb = m + 1.45;
+          tl.fromTo(P + "btn", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, tb);
+          tl.to(P + "btn", { scale: 0.92, duration: 0.14, ease: "power1.in" }, tb + 0.75);
+          tl.to(P + "btn", { scale: 1, duration: 0.5, ease: "back.out(2)" }, tb + 0.89);
+          tl.fromTo(P + "burst", { scale: 1, opacity: 0 }, { scale: 1.25, opacity: 1, duration: 0.25, ease: "power2.out" }, tb + 0.89);
+          tl.to(P + "burst", { opacity: 0, duration: 0.45, ease: "power2.in" }, tb + 1.14);
+
+          // Baris Telegram masuk terakhir, lalu semuanya ditahan untuk dibaca
+          document.querySelectorAll("#{{ID}} .tg").forEach((el, i) => {
+            tl.fromTo(el, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, tb + 1.1 + i * 0.2);
+          });
+
+          window.__timelines["{{ID}}"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>
