@@ -1,0 +1,73 @@
+{
+  "tanggal": "2026-10-03",
+  "username_bot": "DiskonGame_bot",
+  "link_channel": "t.me/diskongame",
+  "steam": [
+    {
+      "judul": "Warhammer 40,000: Mechanicus",
+      "url": "https://store.steampowered.com/app/673880/",
+      "sampul": "",
+      "rating": "92%",
+      "diskon": 95,
+      "harga_awal": 24599900,
+      "harga_akhir": 1229900
+    },
+    {
+      "judul": "Toki Tori 2",
+      "url": "https://store.steampowered.com/app/201420/",
+      "sampul": "",
+      "rating": "87%",
+      "diskon": 93,
+      "harga_awal": 7249900,
+      "harga_akhir": 507500
+    },
+    {
+      "judul": "Divinity: Original Sin - Enhanced Edition",
+      "url": "https://store.steampowered.com/app/373420/",
+      "sampul": "",
+      "rating": "86%",
+      "diskon": 90,
+      "harga_awal": 26999900,
+      "harga_akhir": 2699900
+    },
+    {
+      "judul": "Cruelty Squad",
+      "url": "https://store.steampowered.com/app/1388770/",
+      "sampul": "",
+      "rating": "96%",
+      "diskon": 90,
+      "harga_awal": 10899900,
+      "harga_akhir": 1089900
+    },
+    {
+      "judul": "Metro 2033 Redux",
+      "url": "https://store.steampowered.com/app/286690/",
+      "sampul": "",
+      "rating": "88%",
+      "diskon": 90,
+      "harga_awal": 21400000,
+      "harga_akhir": 2140000
+    }
+  ],
+  "epic": [
+    {
+      "judul": "System Shock 2: 25th Anniversary Remaster",
+      "gambar": "",
+      "berakhir": "08/10 22:00 WIB",
+      "berakhir_iso": "2026-10-08T22:00:00+07:00"
+    }
+  ],
+  "naskah": {
+    "pembuka": "12 ribuan dapet Warhammer 40,000? Hari ini bisa.",
+    "game": [
+      "Nggak salah lihat kok. Potongannya 95 persen.",
+      "Nah, Toki Tori 2. Harganya sekarang 5 ribuan. Ini sih hampir dikasih.",
+      "Divinity, sekarang cuma 26 ribuan. Hematnya 240 ribu lebih!",
+      "Kalau Cruelty Squad? 10 ribuan aja.",
+      "Terakhir, Metro 2033 Redux. Sekarang tinggal 21 ribuan."
+    ],
+    "gratis": "Oh iya, hampir lupa. System Shock 2 lagi gratis di Epic, sampai Kamis malam. Klaim aja dulu, mainnya belakangan.",
+    "penutup": "Semuanya, lengkap sama riwayat harganya, ada di gamediskon titik my titik id. Gas, sebelum diskonnya habis!"
+  },
+  "_catatan": "Data contoh untuk verifikasi otomatis (perbarui-hyperframes.yml). Tanpa gambar supaya tidak perlu unduhan."
+}
