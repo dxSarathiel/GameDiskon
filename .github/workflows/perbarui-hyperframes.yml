@@ -65,7 +65,9 @@ jobs:
           git config user.name "radar-bot"
           git config user.email "radar-bot@users.noreply.github.com"
           git add video_hf/package.json
-          git diff --cached --quiet || (git commit -m "HyperFrames ${{ steps.cek.outputs.lama }} -> ${{ steps.cek.outputs.baru }}" && git pull --rebase && git push)
+          # --autostash: file hasil rakit video contoh (index.html, compositions/) yang terlanjur ada di repo
+          # tidak boleh menghalangi pull; hanya package.json yang disimpan
+          git diff --cached --quiet || (git commit -m "HyperFrames ${{ steps.cek.outputs.lama }} -> ${{ steps.cek.outputs.baru }}" && git pull --rebase --autostash && git push)
 
       - name: Kabari pemilik (berhasil)
         if: success() && steps.cek.outputs.ada == 'ya'
