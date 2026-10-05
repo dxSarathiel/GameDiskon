@@ -46,9 +46,11 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_OWNER_ID: ${{ secrets.TELEGRAM_OWNER_ID }}
-          # Suara TTS otomatis untuk video (opsional; tanpa secret ini video tetap dibuat tanpa suara)
+          # Suara TTS untuk video: ElevenLabs bila secret ini ada, kalau gagal/kosong pakai Microsoft Edge TTS
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}   # kosong = suara Iwan
+          # Suara cadangan gratis (Microsoft Edge TTS) bila ElevenLabs gagal/tidak diset; kosong = id-ID-ArdiNeural
+          EDGE_TTS_VOICE: ${{ vars.EDGE_TTS_VOICE }}
         run: python radar_diskon.py
 
       - name: Simpan catatan deal dan riwayat harga
