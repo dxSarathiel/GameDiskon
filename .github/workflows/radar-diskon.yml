@@ -29,6 +29,18 @@ jobs:
       - name: Pasang FFmpeg untuk render video
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
+      # Runner selalu mesin baru: unduh Chrome versi HyperFrames dulu. Kalau langkah ini gagal,
+      # radar tetap jalan dan video.py memakai video slide biasa (pemilik dikabari lewat Telegram).
+      - name: Siapkan Chrome HyperFrames
+        continue-on-error: true
+        working-directory: video_hf
+        run: |
+          # Ubuntu 24.04 membatasi sandbox Chrome; aman dilonggarkan di runner sekali pakai ini
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          HF=$(grep -oE 'hyperframes@[0-9]+\.[0-9]+\.[0-9]+' package.json | head -1)
+          npx --yes "$HF" browser ensure
+          npx --yes "$HF" doctor || true   # hanya diagnosis di log (Docker dll. memang tidak dipakai)
+
       - name: Jalankan radar
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
