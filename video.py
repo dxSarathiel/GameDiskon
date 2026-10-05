@@ -447,6 +447,29 @@ def _hf_siap():
     return npm
 
 
+def _kabari_pemilik(teks):
+    """Kirim pesan singkat ke pemilik bot di Telegram saat jalur cadangan video terpakai.
+    Jalur cadangan tidak menggagalkan workflow, jadi tanpa pesan ini pemilik tidak tahu.
+    Tidak pernah melempar exception; tanpa TELEGRAM_TOKEN/TELEGRAM_OWNER_ID (mis. uji lokal) diam saja."""
+    token = os.environ.get("TELEGRAM_TOKEN", "").strip()
+    pemilik = os.environ.get("TELEGRAM_OWNER_ID", "").strip()
+    if not token or not pemilik:
+        return
+    run = [os.environ.get(k, "") for k in ("GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID")]
+    if all(run):
+        teks += f"\nLog: {run[0]}/{run[1]}/actions/runs/{run[2]}"
+    try:
+        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", timeout=20,
+                      data={"chat_id": pemilik, "text": teks, "disable_web_page_preview": "true"})
+    except Exception as e:
+        print(f"Gagal mengabari pemilik lewat Telegram: {e}")
+
+
+def _ringkas(e, maks=300):
+    teks = str(e).strip() or type(e).__name__
+    return teks if len(teks) <= maks else teks[:maks] + "…"
+
+
 # ---------- Suara TTS otomatis (ElevenLabs) ----------
 # Aktif kalau secret ELEVENLABS_API_KEY tersedia. Suara bawaan: Iwan (bahasa Indonesia).
 # Ganti suara lewat ELEVENLABS_VOICE_ID tanpa mengubah kode. Biaya kira-kira 1 kredit per huruf naskah.
@@ -766,11 +789,13 @@ def buat_video(steam, epic, path_mp4="video_harian.mp4", username_bot="", link_c
                 suara = buat_suara(segmen, bool(epic), session)
             except Exception as e:
                 print(f"Suara TTS gagal, video dibuat tanpa suara: {e}")
+                _kabari_pemilik(f"⚠️ Video hari ini dibuat TANPA suara (TTS ElevenLabs gagal): {_ringkas(e)}")
             durasi, dengan_suara = rakit_mp4_hyperframes(steam, epic, segmen, sekarang, username_bot,
                                                          link_channel, path_mp4, session, suara)
             print(f"Video HyperFrames selesai ({durasi:.1f} detik, {'dengan' if dengan_suara else 'tanpa'} suara).")
         except Exception as e:
             print(f"HyperFrames gagal, pakai video slide biasa: {e}")
+            _kabari_pemilik(f"⚠️ Video hari ini memakai slide biasa, bukan animasi (HyperFrames gagal): {_ringkas(e)}")
     if durasi is None:
         # Lama tiap slide mengikuti panjang kalimatnya, supaya suara TTS pas dengan gambar
         slide = [(slide_pembuka(len(steam), sekarang, bool(epic)), _lama(segmen["pembuka"], 2.4, 4.5))]
