@@ -8,6 +8,12 @@ on:
 permissions:
   contents: write           # perlu untuk menyimpan sent.json kembali ke repo
 
+# Run manual dan run dari pemicu hosting tidak boleh jalan bersamaan: yang kedua menunggu yang
+# pertama selesai, supaya push sent.json tidak saling tolak (deal bisa terkirim ulang)
+concurrency:
+  group: radar-diskon
+  cancel-in-progress: false
+
 jobs:
   radar:
     runs-on: ubuntu-24.04   # dikunci supaya tidak ikut pindah otomatis ke Ubuntu 26 (Okt 2026)
@@ -58,7 +64,8 @@ jobs:
           git config user.name "radar-bot"
           git config user.email "radar-bot@users.noreply.github.com"
           for f in sent.json harga_idr.json docs; do if [ -e "$f" ]; then git add "$f"; fi; done
-          git diff --cached --quiet || (git commit -m "update data harian" && git push)
+          # pull dulu: kalau ada upload lewat web selama run berjalan, push tidak ditolak
+          git diff --cached --quiet || (git commit -m "update data harian" && git pull --rebase --autostash && git push)
       # Penerbitan ke hosting dan pemeriksaan alarm harga sekarang dijalankan oleh Cron Job cPanel
       # di hosting sendiri (bot/tarik.php tiap 30 menit, bot/periksa.php tiap 2 jam), jadi tidak kena
       # perlindungan anti-bot hosting dan tidak perlu upload FTP lagi.
