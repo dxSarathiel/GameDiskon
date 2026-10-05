@@ -1,0 +1,10 @@
+# Dibuat ulang setiap kali video.py jalan
+index.html
+compositions/
+assets/sampul/
+renders/
+snapshots/
+.hyperframes/
+node_modules/
+assets/suara/
+__pycache__/
