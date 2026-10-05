@@ -470,14 +470,19 @@ def _ringkas(e, maks=300):
     return teks if len(teks) <= maks else teks[:maks] + "…"
 
 
-# ---------- Suara TTS otomatis (ElevenLabs) ----------
-# Aktif kalau secret ELEVENLABS_API_KEY tersedia. Suara bawaan: Iwan (bahasa Indonesia).
-# Ganti suara lewat ELEVENLABS_VOICE_ID tanpa mengubah kode. Biaya kira-kira 1 kredit per huruf naskah.
+# ---------- Suara TTS otomatis: ElevenLabs, cadangan Microsoft Edge TTS ----------
+# Urutan: ElevenLabs (kalau secret ELEVENLABS_API_KEY ada) -> Microsoft Edge TTS (gratis, tanpa API key)
+# -> tanpa suara. Suara ElevenLabs bawaan Iwan, ganti lewat ELEVENLABS_VOICE_ID (biaya ~1 kredit per huruf).
+# Suara Edge bawaan id-ID-ArdiNeural, ganti lewat EDGE_TTS_VOICE (mis. id-ID-GadisNeural).
 SUARA_BAWAAN = "1kNciG1jHVSuFBPoxdRZ"       # "Iwan - Informative, Authentic and Clear"
+SUARA_EDGE = "id-ID-ArdiNeural"
 MODEL_TTS = "eleven_multilingual_v2"
 RAPIKAN_SUARA = ("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03,areverse,"
                  "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03,areverse,"
-                 "loudnorm=I=-15:TP=-1.5:LRA=11")
+                 "loudnorm=I={keras}:TP=-1.5:LRA=11")
+# Target keras per klip supaya video jadi sekitar -14 LUFS (standar TikTok). Suara Edge lebih padat,
+# jadi targetnya lebih rendah.
+KERAS_ELEVENLABS, KERAS_EDGE = -15, -17.5
 
 
 def _teks_tts(teks):
@@ -494,41 +499,79 @@ def _tts_elevenlabs(teks, api_key, voice_id, session=None):
         if r.status_code == 429 and coba < 2:      # batas proses bersamaan: tunggu, coba lagi
             time.sleep(4 * (coba + 1))
             continue
-        r.raise_for_status()
+        if r.status_code >= 400:
+            # Sertakan penjelasan ElevenLabs (mis. izin API key, kuota, suara pustaka di paket gratis)
+            try:
+                detail = r.json().get("detail", {})
+                alasan = detail.get("message") or detail.get("status") if isinstance(detail, dict) else detail
+            except ValueError:
+                alasan = r.text[:200]
+            raise RuntimeError(f"ElevenLabs HTTP {r.status_code}: {alasan or r.reason}")
         return r.content
+
+
+def _tts_edge(teks, voice):
+    """Microsoft Edge TTS (paket edge-tts): gratis, tanpa API key. Kembalikan audio MP3."""
+    import asyncio
+    import edge_tts
+
+    async def jalan():
+        data = bytearray()
+        async for potong in edge_tts.Communicate(teks, voice).stream():
+            if potong["type"] == "audio":
+                data.extend(potong["data"])
+        return bytes(data)
+
+    hasil = asyncio.run(jalan())
+    if not hasil:
+        raise RuntimeError(f"Edge TTS ({voice}) tidak mengembalikan audio")
+    return hasil
 
 
 def buat_suara(segmen, ada_gratis, session=None):
     """Satu klip per adegan, dibuat berurutan. Hening di awal/akhir dipotong dan keras disamakan.
-    Kembalikan {"pembuka": {file, durasi}, "game": [...], "gratis": ..., "penutup": ...},
-    atau None kalau ELEVENLABS_API_KEY tidak diset. Melempar exception kalau API gagal."""
+    Coba ElevenLabs dulu (bila ada API key), lalu Microsoft Edge TTS sebagai cadangan.
+    Kembalikan {"pembuka": {file, durasi}, "game": [...], "gratis": ..., "penutup": ...}.
+    Melempar exception kalau semua penyedia suara gagal."""
     import shutil
-    api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
-    if not api_key:
-        return None
-    voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "").strip() or SUARA_BAWAAN
     folder = os.path.join(FOLDER_HF, "assets", "suara")
-    shutil.rmtree(folder, ignore_errors=True)
-    os.makedirs(folder)
+    daftar = ([("pembuka", segmen["pembuka"])]
+              + [(f"game-{i}", t) for i, t in enumerate(segmen["game"], 1)]
+              + ([("gratis", segmen["gratis"])] if ada_gratis and segmen["gratis"] else [])
+              + [("penutup", segmen["penutup"])])
 
-    def satu(nama, teks):
-        mp3, wav = os.path.join(folder, nama + ".mp3"), os.path.join(folder, nama + ".wav")
-        with open(mp3, "wb") as f:
-            f.write(_tts_elevenlabs(_teks_tts(teks), api_key, voice_id, session))
-        subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", mp3, "-af", RAPIKAN_SUARA,
-                        "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", wav], check=True)
-        os.remove(mp3)
-        with wave.open(wav) as w:
-            durasi = w.getnframes() / w.getframerate()
-        return {"file": f"assets/suara/{nama}.wav", "durasi": round(durasi, 3)}
+    def rakit(buat_mp3, keras):
+        shutil.rmtree(folder, ignore_errors=True)
+        os.makedirs(folder)
+        klip = {}
+        for nama, teks in daftar:
+            mp3, wav = os.path.join(folder, nama + ".mp3"), os.path.join(folder, nama + ".wav")
+            with open(mp3, "wb") as f:
+                f.write(buat_mp3(_teks_tts(teks)))
+            subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", mp3, "-af", RAPIKAN_SUARA.format(keras=keras),
+                            "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", wav], check=True)
+            os.remove(mp3)
+            with wave.open(wav) as w:
+                durasi = w.getnframes() / w.getframerate()
+            klip[nama] = {"file": f"assets/suara/{nama}.wav", "durasi": round(durasi, 3)}
+        return {"pembuka": klip["pembuka"],
+                "game": [klip[f"game-{i}"] for i in range(1, len(segmen["game"]) + 1)],
+                "gratis": klip.get("gratis"), "penutup": klip["penutup"]}
 
-    suara = {"pembuka": satu("pembuka", segmen["pembuka"]),
-             "game": [satu(f"game-{i}", t) for i, t in enumerate(segmen["game"], 1)],
-             "gratis": satu("gratis", segmen["gratis"]) if ada_gratis and segmen["gratis"] else None,
-             "penutup": satu("penutup", segmen["penutup"])}
-    huruf = sum(len(t) for t in [segmen["pembuka"], *segmen["game"], segmen["penutup"]]
-                + ([segmen["gratis"]] if suara["gratis"] else []))
-    print(f"Suara TTS siap ({voice_id}, sekitar {huruf} kredit).")
+    suara_edge = os.environ.get("EDGE_TTS_VOICE", "").strip() or SUARA_EDGE
+    api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
+    if api_key:
+        voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "").strip() or SUARA_BAWAAN
+        try:
+            suara = rakit(lambda t: _tts_elevenlabs(t, api_key, voice_id, session), KERAS_ELEVENLABS)
+            print(f"Suara TTS siap (ElevenLabs {voice_id}, sekitar {sum(len(t) for _, t in daftar)} kredit).")
+            return suara
+        except Exception as e:
+            print(f"Suara ElevenLabs gagal, pakai suara cadangan Microsoft Edge: {e}")
+            _kabari_pemilik(f"⚠️ Suara ElevenLabs gagal, video memakai suara cadangan Microsoft Edge "
+                            f"({suara_edge}): {_ringkas(e)}")
+    suara = rakit(lambda t: _tts_edge(t, suara_edge), KERAS_EDGE)
+    print(f"Suara TTS siap (Microsoft Edge {suara_edge}).")
     return suara
 
 
@@ -779,7 +822,7 @@ def buat_video(steam, epic, path_mp4="video_harian.mp4", username_bot="", link_c
     sekarang = datetime.now(WIB)
     segmen, acak = susun_teks(steam, epic, sekarang)
 
-    # Utama: video animasi HyperFrames (+ suara TTS bila ada API key). Cadangan: slide Pillow tanpa suara.
+    # Utama: video animasi HyperFrames + suara TTS (ElevenLabs, cadangan Edge). Cadangan video: slide Pillow tanpa suara.
     durasi, dengan_suara = None, False
     if os.environ.get("VIDEO_HYPERFRAMES", "1") != "0":
         try:
@@ -789,7 +832,7 @@ def buat_video(steam, epic, path_mp4="video_harian.mp4", username_bot="", link_c
                 suara = buat_suara(segmen, bool(epic), session)
             except Exception as e:
                 print(f"Suara TTS gagal, video dibuat tanpa suara: {e}")
-                _kabari_pemilik(f"⚠️ Video hari ini dibuat TANPA suara (TTS ElevenLabs gagal): {_ringkas(e)}")
+                _kabari_pemilik(f"⚠️ Video hari ini dibuat TANPA suara (ElevenLabs dan Microsoft Edge gagal): {_ringkas(e)}")
             durasi, dengan_suara = rakit_mp4_hyperframes(steam, epic, segmen, sekarang, username_bot,
                                                          link_channel, path_mp4, session, suara)
             print(f"Video HyperFrames selesai ({durasi:.1f} detik, {'dengan' if dengan_suara else 'tanpa'} suara).")
