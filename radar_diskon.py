@@ -173,14 +173,14 @@ def _tgl(iso):
 
 
 def _periode(mulai, selesai):
-    """1–8 Oktober 2026  /  17 Desember 2026 – 4 Januari 2027"""
+    """1-8 Oktober 2026  /  17 Desember 2026 - 4 Januari 2027"""
     if mulai.year != selesai.year:
-        return (f"{mulai.day} {BULAN_ID[mulai.month - 1]} {mulai.year} – "
+        return (f"{mulai.day} {BULAN_ID[mulai.month - 1]} {mulai.year} - "
                 f"{selesai.day} {BULAN_ID[selesai.month - 1]} {selesai.year}")
     if mulai.month != selesai.month:
-        return (f"{mulai.day} {BULAN_ID[mulai.month - 1]} – "
+        return (f"{mulai.day} {BULAN_ID[mulai.month - 1]} - "
                 f"{selesai.day} {BULAN_ID[selesai.month - 1]} {selesai.year}")
-    return f"{mulai.day}–{selesai.day} {BULAN_ID[mulai.month - 1]} {mulai.year}"
+    return f"{mulai.day}-{selesai.day} {BULAN_ID[mulai.month - 1]} {mulai.year}"
 
 
 def _mulai_wib(tanggal_iso):

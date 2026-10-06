@@ -115,7 +115,7 @@ def _tgl_pendek(iso):
 
 def _barang_steam(g, urutan):
     """Satu barang di rak: sampul, nama, ulasan, dan label harga kuning di tepi rak."""
-    gambar_attr = 'fetchpriority="high"' if urutan == 0 else 'loading="lazy"'
+    gambar_attr = 'loading="lazy"'   # gambar terbesar di atas lipatan adalah game unggulan di hero
     tujuan = f'/{g["halaman"]}' if g.get("halaman") else g["url"]
     rel = '' if g.get("halaman") else ' rel="noopener"'
     terendah = ""
@@ -147,7 +147,7 @@ def _kartu_epic(g, pertama):
     return f"""
       <li>
         <a href="{escape(g['url'])}" rel="noopener">
-          <span class="stempel" aria-hidden="true">GRATIS</span>
+          <span class="stempel" aria-hidden="true"><span lang="ja">無料</span>GRATIS</span>
           <img src="{escape(gambar_epic(g['gambar']))}" alt="" width="640" height="360" {gambar_attr} decoding="async">
           <h3>{escape(g['judul'])}</h3>
           <p class="batas">Klaim sebelum {escape(g['berakhir'])}<span class="sisa" data-berakhir="{escape(iso)}"></span></p>
@@ -274,40 +274,61 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
         else:
             teks_event = f"{event['nama']} dimulai {event.get('mulai_wib') or event['mulai_teks']}."
 
-    # --- Judul besar di pita biru ---
+    # --- Judul besar ---
     ringkas = []
     if steam:
-        ringkas.append(f"{len(steam)} diskon lolos saringan")
+        ringkas.append(f"{len(steam)} diskon")
     if epic:
-        ringkas.append(f"{len(epic)} game gratis di Epic")
-    kalimat = (f"Dicek {HARI[sekarang.weekday()]}, {_tanggal_panjang(sekarang)} pukul {sekarang:%H.%M} WIB"
+        ringkas.append(f"{len(epic)} game gratis")
+    kalimat = (f"Harga asli Steam Indonesia, bukan konversi dolar. Dicek {HARI[sekarang.weekday()]} "
+               f"{sekarang.day} {BULAN[sekarang.month - 1]}, {sekarang:%H.%M} WIB"
                + (f": {' dan '.join(ringkas)}." if ringkas else "."))
-    event_html = (f'\n        <p class="event"><a href="/jadwal-steam-sale/">{escape(teks_event)}</a></p>'
-                  if teks_event else "")
+    # Kalau ada event sale, baris kecil di atas judul berubah jadi tautan ke jadwal sale
+    kicker = (f'<a href="/jadwal-steam-sale/">{escape(teks_event)}</a>' if teks_event
+              else "Promo game PC, dicek tiap sore")
+    tombol_gratis = ('\n          <a class="tombol kedua" href="#h-gratis">Game gratis Epic</a>' if epic else "")
     unggulan = ""
     if steam:
-        # Potongan paling besar hari ini (kalau sama, yang paling murah) ditempel sebagai stiker
+        # Potongan paling besar hari ini (kalau sama, yang paling murah): sampul + papan toko 本日特価
         g = max(steam, key=lambda x: (x["diskon"], -x["harga_akhir"]))
         tujuan = f'/{g["halaman"]}' if g.get("halaman") else g["url"]
+        # Sampul Steam yang lebih besar (616x353) kalau ada; kalau gagal dimuat, kembali ke gambar biasa
+        sampul, cadangan = g["gambar"], ""
+        if sampul.endswith("/header.jpg"):
+            sampul = sampul[:-len("header.jpg")] + "capsule_616x353.jpg"
+            cadangan = f' onerror="this.onerror=null;this.src=\'{escape(g["gambar"])}\'"'
         unggulan = f"""
       <a class="unggulan" href="{escape(tujuan)}">
-        <span class="unggulan-ket">Potongan terbesar hari ini</span>
-        <span class="stiker"><span class="potong">-{g['diskon']}%</span><span class="harga"><strong>{_rupiah(g['harga_akhir'])}</strong><s>{_rupiah(g['harga_awal'])}</s></span></span>
-        <span class="unggulan-nama">{escape(g['judul'])}</span>
+        <span class="unggulan-gambar">
+          <img src="{escape(sampul)}" alt="" width="616" height="353" fetchpriority="high" decoding="async"{cadangan}>
+          <span class="potong">-{g['diskon']}%</span>
+        </span>
+        <span class="noren" lang="ja" aria-hidden="true">本日特価</span>
+        <span class="unggulan-isi">
+          <span class="unggulan-ket">Potongan terbesar hari ini</span>
+          <span class="unggulan-nama">{escape(g['judul'])}</span>
+          <span class="harga"><strong>{_rupiah(g['harga_akhir'])}</strong><s>{_rupiah(g['harga_awal'])}</s></span>
+        </span>
       </a>"""
     hero = f"""
     <div class="hero">
-      <div>
-        <p class="kicker">Promo game PC, dicek tiap hari</p>
-        <h1><span class="baris">Diskon Steam</span> <span class="baris">hari ini,</span> <span class="sorot">dalam Rupiah</span></h1>
-        <p>{escape(kalimat)} Harga diambil langsung dari Steam region Indonesia, bukan hasil konversi dolar.</p>{event_html}
+      <span class="sfx" lang="ja" aria-hidden="true">セール</span>
+      <div class="hero-judul">
+        <p class="kicker">{kicker}</p>
+        <h1><span class="baris">Diskon Steam hari ini,</span> <span class="sorot">dalam Rupiah</span></h1>
+      </div>
+      <div class="hero-teks">
+        <p>{escape(kalimat)}</p>
+        <div class="hero-aksi">
+          <a class="tombol" href="#h-steam">Lihat rak diskon</a>{tombol_gratis}
+        </div>
       </div>{unggulan}
     </div>"""
 
     # --- Game gratis Epic ---
     bagian_epic = ""
     if epic:
-        kartu = "".join(_kartu_epic(g, i == 0) for i, g in enumerate(epic))
+        kartu = "".join(_kartu_epic(g, i == 0 and not steam) for i, g in enumerate(epic))
         bagian_epic = f"""
     <section class="bagian" aria-labelledby="h-gratis">
       <h2 id="h-gratis">Gratis di Epic Games Store</h2>
@@ -386,7 +407,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
         <h2 id="h-alarm">Menunggu harga lebih murah?</h2>
         <p>Pasang alarm harga di Telegram. Ketik nama game, pilih target harganya, dan kamu akan dikabari saat harganya di Steam Indonesia turun sampai target itu.</p>
       </div>
-      <a class="tombol" href="https://t.me/{escape(USERNAME_BOT_ALARM)}" rel="noopener">🔔 Pasang alarm harga</a>
+      <a class="tombol" href="https://t.me/{escape(USERNAME_BOT_ALARM)}" rel="noopener">Pasang alarm harga</a>
     </aside>"""
     bagian_info = ""
     if info_terbaru:

@@ -94,7 +94,7 @@ def _kartu_mendatang(g):
     return f"""
       <li>
         <a href="{escape(g['url'])}" rel="noopener">
-          <span class="stempel" aria-hidden="true">SEGERA</span>
+          <span class="stempel" aria-hidden="true"><span lang="ja">近日</span>SEGERA</span>
           {gambar}
           <h3>{escape(g['judul'])}</h3>
           <p class="batas">Gratis mulai {escape(_wib(_iso_ke_dt(g['mulai'])))}</p>
@@ -235,7 +235,7 @@ def buat_halaman_steam_sale(event_sale, steam_layak=None, folder="docs"):
     daftar.sort(key=lambda e: e["dt_mulai"])
     tahun = sorted({e["dt_mulai"].year for e in daftar if e["status"] != "Sudah selesai"} or
                    {daftar[-1]["dt_mulai"].year})
-    tahun_teks = str(tahun[0]) if len(tahun) == 1 else f"{tahun[0]}–{tahun[-1]}"
+    tahun_teks = str(tahun[0]) if len(tahun) == 1 else f"{tahun[0]}-{tahun[-1]}"
 
     # Event yang paling relevan: yang sedang berlangsung, kalau tidak ada yang berikutnya
     utama = (next((e for e in daftar if e["status"] == "Berlangsung"), None)
@@ -246,7 +246,6 @@ def buat_halaman_steam_sale(event_sale, steam_layak=None, folder="docs"):
     <p class="catatan">Tanggal dari jadwal resmi Valve untuk developer (Steamworks). Steam Sale biasanya dimulai dan berakhir pukul 10.00 waktu Pasifik, jadi di Indonesia mulainya sekitar tengah malam WIB. Semua jam di bawah sudah dalam WIB.</p>"""]
 
     if utama:
-        emoji = escape(utama.get("emoji", ""))
         if utama["status"] == "Berlangsung":
             teks = (f"<p><strong>Sedang berlangsung</strong> sampai {escape(_wib(utama['dt_selesai']))}.</p>"
                     f'<p><a class="tombol" href="https://store.steampowered.com/specials" rel="noopener">Buka halaman sale di Steam</a></p>')
@@ -259,7 +258,7 @@ def buat_halaman_steam_sale(event_sale, steam_layak=None, folder="docs"):
         isi.append(f"""
     <aside class="voucher lebar" aria-labelledby="h-utama">
       <div>
-        <h2 id="h-utama">{emoji} {escape(utama['nama'])}</h2>
+        <h2 id="h-utama">{escape(utama['nama'])}</h2>
         {teks}
       </div>
     </aside>""")

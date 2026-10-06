@@ -109,7 +109,7 @@ def _tulis_laporan(senin, minggu, turun, naik, termurah):
     turun.sort(key=lambda i: i["ke"] / max(i["dari"], 1))      # penurunan terbesar (persentase) di atas
     naik.sort(key=lambda i: i["ke"] - i["dari"], reverse=True)
     terbit = minggu + timedelta(days=1)
-    periode = f"{_tgl_pendek(senin)} – {_tgl_pendek(minggu)} {minggu.year}"
+    periode = f"{_tgl_pendek(senin)} - {_tgl_pendek(minggu)} {minggu.year}"
     judul = f"Laporan Harga Steam Indonesia Minggu Ini ({periode})"
     deskripsi = (f"{len(turun)} game Steam turun harga dan {len(naik)} naik dalam sepekan ({periode}). "
                  f"Rangkuman perubahan harga dalam Rupiah dari data pantauan GameDiskon.")

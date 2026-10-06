@@ -304,7 +304,7 @@ def _html_game(r, situs, link_telegram, hari_ini, aktif=()):
     if USERNAME_BOT_ALARM:
         # Membuka bot dengan game ini langsung terpilih (/start <appid>)
         tombol_tg = (f'<a class="tombol kedua" href="https://t.me/{escape(USERNAME_BOT_ALARM)}?start={r["appid"]}" rel="noopener">'
-                     f'🔔 Pasang alarm harga</a>')
+                     f'Pasang alarm harga</a>')
     elif link_telegram:
         tombol_tg = (f'<a class="tombol kedua" href="https://{escape(link_telegram)}" rel="noopener">'
                      f'Ikuti kabar diskon di Telegram</a>')
