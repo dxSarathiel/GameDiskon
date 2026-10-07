@@ -30,7 +30,7 @@ EKOR_SUARA = 0.35             # napas setelah kalimat sebelum adegan berganti
 EKOR_PENUTUP = 1.2            # penutup tetap tertahan sebentar setelah kalimat terakhir
 # Lama tumpang-tindih tiap jenis transisi (detik)
 TRANSISI = {"zoom": 0.55, "push": 0.45, "grid": 0.6, "fade": 0.6}
-PALET_GRID = ["#192030", "#7b61ff", "#121722", "#ff4d8d", "#262f42"]   # gelap dominan + aksen ungu/magenta (pengantar ke adegan Epic)
+PALET_GRID = ["#1b1e2b", "#f6e146", "#12141e", "#262a3a", "#0a0b12"]   # tinta gelap dominan + satu aksen kuning (tema "Shonen Sale")
 
 
 def lama(teks, minimal, maksimal):
@@ -71,7 +71,7 @@ def _r(x):
 # ---------- Adegan ----------
 def _pembuka(id_, data, steam, epic, tgl, dur, mulai):
     g0 = steam[0]
-    pill = f'<div class="abs" id="{id_}-pill">+ GAME GRATIS</div>' if epic else ""
+    pill = f'<div class="abs" id="{id_}-pill">+ GAME GRATIS<span class="jp">無料</span></div>' if epic else ""
     return _isi(_template("pembuka.html"), {
         "ID": id_, "SAMPUL": _e(g0["sampul"]), "DISKON": int(g0["diskon"]),
         "TGL_PENDEK": f"{tgl.day} {BULAN[tgl.month - 1]}",
