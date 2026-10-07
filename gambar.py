@@ -1,80 +1,52 @@
 """
 Membuat gambar ringkasan diskon (JPG) untuk dikirim ke Telegram.
-Semua bahan gratis: Pillow, font Poppins (lisensi OFL, diunduh otomatis),
-cover game dari Steam dan Epic.
+Tampilannya sama dengan situs dan video (tema "Shonen Sale"): tinta gelap, satu aksen kuning,
+logo 割, panel bersudut potong, label miring. Bentuk, warna, dan huruf diambil dari video.py.
+Semua bahan gratis: Pillow, huruf Archivo & Dela Gothic One (OFL), cover game dari Steam dan Epic.
 """
 
-import os
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
-import requests
 from PIL import Image, ImageDraw, ImageFont
+
+import video
+from video import HIJAU, KUNING, LATAR, PANEL, REDUP, SEMPIT, TINTA
 
 # ---------- Tampilan (boleh diubah) ----------
 LEBAR = 1080
 MAKS_KARTU = 4
 
-WARNA_BG_ATAS = (20, 22, 31)
-WARNA_BG_BAWAH = (10, 11, 15)
-WARNA_KARTU = (29, 32, 43)
-WARNA_AKSEN = (255, 107, 53)     # oranye: badge diskon
-WARNA_GRATIS = (46, 204, 113)    # hijau: badge gratis & label terendah
-WARNA_TEKS = (245, 245, 247)
-WARNA_REDUP = (150, 155, 170)
-
-FOLDER_FONT = "fonts"
-URL_FONT = "https://github.com/google/fonts/raw/main/ofl/poppins/{}"
-
 # Ukuran tata letak
 PAD = 60
 KARTU_H = 240
-KARTU_JARAK = 18
+KARTU_JARAK = 20
 COVER_H = 206
 COVER_W = 440
-RADIUS = 20
 
 WIB = timezone(timedelta(hours=7))
 
 
-# ---------- Font ----------
-def _font(nama_file, ukuran):
-    path = os.path.join(FOLDER_FONT, nama_file)
-    if not os.path.exists(path):
+# ---------- Huruf ----------
+_FONT_SIAP = None
+
+
+def _huruf(ukuran, tebal=900, lebar=100):
+    """Archivo dari video.py; kalau unduhan gagal, pakai huruf bawaan supaya gambar tetap jadi."""
+    global _FONT_SIAP
+    if _FONT_SIAP is None:
         try:
-            os.makedirs(FOLDER_FONT, exist_ok=True)
-            r = requests.get(URL_FONT.format(nama_file), timeout=30)
-            r.raise_for_status()
-            with open(path, "wb") as f:
-                f.write(r.content)
+            video._siapkan_font()
+            _FONT_SIAP = True
         except Exception as err:
-            print(f"Font {nama_file} gagal diunduh ({err}), pakai font bawaan.")
-            return ImageFont.load_default(size=ukuran)
-    return ImageFont.truetype(path, ukuran)
-
-
-class Font:
-    def __init__(self):
-        self.label = _font("Poppins-Medium.ttf", 24)
-        self.kecil = _font("Poppins-Medium.ttf", 26)
-        self.sedang = _font("Poppins-Medium.ttf", 28)
-        self.judul = _font("Poppins-Bold.ttf", 32)
-        self.harga = _font("Poppins-Bold.ttf", 38)
-        self.badge = _font("Poppins-Bold.ttf", 32)
-        self.besar = _font("Poppins-Bold.ttf", 64)
+            print(f"Huruf Archivo gagal diunduh ({err}), pakai huruf bawaan.")
+            _FONT_SIAP = False
+    if _FONT_SIAP:
+        return video.huruf(ukuran, tebal, lebar)
+    return ImageFont.load_default(size=ukuran)
 
 
 # ---------- Bantuan gambar ----------
-def _gradien(w, h):
-    bg = Image.new("RGB", (w, h))
-    d = ImageDraw.Draw(bg)
-    for y in range(h):
-        t = y / max(h - 1, 1)
-        warna = tuple(int(a + (b - a) * t) for a, b in zip(WARNA_BG_ATAS, WARNA_BG_BAWAH))
-        d.line([(0, y), (w, y)], fill=warna)
-    return bg
-
-
 def _ambil_cover(url, session):
     """Unduh cover, potong tengah ke rasio kartu. Kalau gagal, kotak polos."""
     try:
@@ -94,13 +66,7 @@ def _ambil_cover(url, session):
         return img.resize((COVER_W, COVER_H), Image.LANCZOS)
     except Exception as err:
         print(f"Cover gagal diambil ({err}).")
-        return Image.new("RGB", (COVER_W, COVER_H), (45, 49, 62))
-
-
-def _tempel_bulat(kanvas, img, xy, radius):
-    mask = Image.new("L", img.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, img.size[0], img.size[1]], radius, fill=255)
-    kanvas.paste(img, xy, mask)
+        return Image.new("RGB", (COVER_W, COVER_H), video.PANEL_2)
 
 
 def _bungkus(draw, teks, font, lebar_maks, maks_baris=2):
@@ -128,59 +94,52 @@ def _bungkus(draw, teks, font, lebar_maks, maks_baris=2):
     return baris[:maks_baris]
 
 
-def _badge(draw, x, y, teks, font, warna):
-    lebar = draw.textlength(teks, font=font) + 32
-    draw.rounded_rectangle([x, y, x + lebar, y + 54], 14, fill=warna)
-    draw.text((x + 16, y + 27), teks, font=font, fill=(255, 255, 255), anchor="lm")
-    return x + lebar
-
-
 def _rupiah(sen):
     return "Rp " + f"{sen // 100:,}".replace(",", ".")
 
 
 # ---------- Kartu ----------
-def _kartu(kanvas, draw, f, y, item, cover):
+def _kartu(kanvas, y, item, cover):
     x0, x1 = PAD, LEBAR - PAD
-    draw.rounded_rectangle([x0, y, x1, y + KARTU_H], RADIUS, fill=WARNA_KARTU)
-    _tempel_bulat(kanvas, cover, (x0 + 17, y + 17), 14)
+    video._kartu(kanvas, (x0, y, x1 - x0, KARTU_H), potong=30, isi=PANEL)
+    kanvas.paste(cover, (x0 + 17, y + 17))
+    draw = ImageDraw.Draw(kanvas)
 
     tx = x0 + 17 + COVER_W + 28          # awal kolom teks
-    lebar_teks = x1 - 24 - tx
+    lebar_teks = x1 - 30 - tx
 
-    # Baris atas: nama toko (+ rating), dan label terendah
-    if item["jenis"] == "epic":
-        atas = "EPIC GAMES STORE"
-    else:
-        atas = f"STEAM  ·  {item['rating']} positif"
-    draw.text((tx, y + 30), atas, font=f.label, fill=WARNA_REDUP, anchor="lm")
+    # Baris atas: nama toko (+ rating)
+    atas = "EPIC GAMES STORE" if item["jenis"] == "epic" else f"STEAM  ·  {item['rating']} POSITIF"
+    draw.text((tx, y + 26), atas, font=_huruf(22, 800), fill=REDUP)
 
     # Judul (maks 2 baris)
-    for i, b in enumerate(_bungkus(draw, item["judul"], f.judul, lebar_teks)):
-        draw.text((tx, y + 58 + i * 40), b, font=f.judul, fill=WARNA_TEKS)
+    f_judul = _huruf(34, 800)
+    for i, b in enumerate(_bungkus(draw, item["judul"], f_judul, lebar_teks)):
+        draw.text((tx, y + 58 + i * 40), b, font=f_judul, fill=TINTA)
 
     # Baris harga
     by = y + 152
     if item["jenis"] == "epic":
-        xb = _badge(draw, tx, by, "GRATIS", f.badge, WARNA_GRATIS)
-        draw.text((xb + 18, by + 4), "Klaim sebelum", font=f.kecil, fill=WARNA_REDUP)
-        draw.text((xb + 18, by + 32), item["berakhir"], font=f.kecil, fill=WARNA_TEKS)
+        # Gelembung 無料 menempel di pojok cover, seperti stempel di situs
+        kanvas.alpha_composite(video._ledakan("無料", "GRATIS", 128), (x0 - 8, y - 14))
+        draw = ImageDraw.Draw(kanvas)
+        draw.text((tx, by + 2), "Klaim sebelum", font=_huruf(24, 500), fill=REDUP)
+        draw.text((tx, by + 30), item["berakhir"], font=_huruf(40, 900, SEMPIT), fill=KUNING)
     else:
-        xb = _badge(draw, tx, by, f"-{item['diskon']}%", f.badge, WARNA_AKSEN)
-        draw.text((xb + 18, by - 6), _rupiah(item["harga_akhir"]), font=f.harga, fill=WARNA_TEKS)
-        coret = _rupiah(item["harga_awal"])
-        cx, cy = xb + 20, by + 42
-        draw.text((cx, cy), coret, font=f.kecil, fill=WARNA_REDUP)
-        lebar_coret = draw.textlength(coret, font=f.kecil)
-        tengah = cy + 19
-        draw.line([(cx, tengah), (cx + lebar_coret, tengah)], fill=WARNA_REDUP, width=2)
+        label, _ = video._label(f"-{item['diskon']}%", _huruf(36, 900, SEMPIT), LATAR, KUNING, 14, 9)
+        kanvas.alpha_composite(label, (tx, by + 2))
+        draw = ImageDraw.Draw(kanvas)
+        hx = tx + label.width + 16
+        draw.text((hx, by - 6), _rupiah(item["harga_akhir"]), font=_huruf(44, 900, SEMPIT), fill=TINTA)
+        coret, f_coret = _rupiah(item["harga_awal"]), _huruf(24, 500)
+        cy = by + 44
+        draw.text((hx, cy), coret, font=f_coret, fill=REDUP)
+        tengah = cy + f_coret.getbbox(coret)[3] * 0.6
+        draw.line([(hx, tengah), (hx + draw.textlength(coret, font=f_coret), tengah)], fill=REDUP, width=2)
         if item.get("terendah_sejak"):
-            # Label ditempel di pojok kiri bawah cover supaya tidak bertabrakan dengan teks
-            label = "TERENDAH TERCATAT"
-            lw = draw.textlength(label, font=f.label) + 28
-            lx, ly = x0 + 17 + 12, y + 17 + COVER_H - 12 - 38
-            draw.rounded_rectangle([lx, ly, lx + lw, ly + 38], 10, fill=WARNA_GRATIS)
-            draw.text((lx + 14, ly + 19), label, font=f.label, fill=(255, 255, 255), anchor="lm")
+            # Label status hijau di pojok kiri bawah cover supaya tidak bertabrakan dengan teks
+            status, _ = video._label("TERENDAH TERCATAT", _huruf(20, 900), LATAR, HIJAU, 12, 7)
+            kanvas.alpha_composite(status, (x0 + 29, y + 17 + COVER_H - 12 - status.height))
 
 
 # ---------- Fungsi utama ----------
@@ -192,35 +151,44 @@ def buat_gambar(epic, steam, path_keluar, session, nama_channel="", link_channel
     if not items:
         return None
 
-    f = Font()
-    header_h = 250
-    footer_h = 100 if link_channel else 50
+    header_h = 300
+    footer_h = 110 if link_channel else 50
     tinggi = header_h + len(items) * KARTU_H + (len(items) - 1) * KARTU_JARAK + footer_h
 
-    kanvas = _gradien(LEBAR, tinggi)
-    draw = ImageDraw.Draw(kanvas)
+    kanvas = video._latar(LEBAR, tinggi, 0.9)
+    _huruf(10)                           # unduh Archivo sekali; hasilnya menentukan _FONT_SIAP
 
-    # Header
-    if nama_channel:
-        draw.text((PAD, 62), nama_channel.upper(), font=f.sedang, fill=WARNA_AKSEN)
-    draw.text((PAD, 96), "Diskon Hari Ini", font=f.besar, fill=WARNA_TEKS)
-    tanggal = datetime.now(WIB).strftime("%d/%m/%Y")
-    if label_event:
-        draw.text((PAD, 182), f"{tanggal}  ·  {label_event}", font=f.sedang, fill=WARNA_AKSEN)
+    # Header: logo, kicker, judul berpita kuning, tanggal
+    if _FONT_SIAP:
+        kanvas.alpha_composite(video._logo(0.6), (PAD, 48))
+        if nama_channel:
+            video._kicker(ImageDraw.Draw(kanvas), nama_channel, PAD, 128, KUNING, 24)
+        video._judul_besar(kanvas, ["Diskon hari ini"], PAD, 170, 66)
     else:
-        draw.text((PAD, 182), f"{tanggal}  ·  Harga Steam Indonesia", font=f.sedang, fill=WARNA_REDUP)
+        ImageDraw.Draw(kanvas).text((PAD, 170), "DISKON HARI INI", font=_huruf(66), fill=TINTA)
+    draw = ImageDraw.Draw(kanvas)
+    tanggal = datetime.now(WIB).strftime("%d/%m/%Y")
+    f_sub = _huruf(26, 600)
+    teks_tgl = f"{tanggal}  ·  "
+    draw.text((PAD, 258), teks_tgl, font=f_sub, fill=REDUP)
+    draw.text((PAD + draw.textlength(teks_tgl, font=f_sub), 258), label_event or "Harga Steam Indonesia",
+              font=f_sub, fill=KUNING if label_event else REDUP)
 
     # Kartu
-    y = header_h
+    y = header_h + 6
     for item in items:
-        cover = _ambil_cover(item["gambar"], session)
-        _kartu(kanvas, draw, f, y, item, cover)
+        _kartu(kanvas, y, item, _ambil_cover(item["gambar"], session))
         y += KARTU_H + KARTU_JARAK
 
     # Footer
     if link_channel:
-        draw.text((LEBAR // 2, tinggi - 55), f"Info lengkap & link: {link_channel}",
-                  font=f.sedang, fill=WARNA_REDUP, anchor="mm")
+        draw = ImageDraw.Draw(kanvas)
+        f_kaki = _huruf(28, 600)
+        awal, link = "Info lengkap & link: ", link_channel
+        lebar = draw.textlength(awal, font=f_kaki) + draw.textlength(link, font=_huruf(28, 900))
+        x = (LEBAR - lebar) / 2
+        draw.text((x, tinggi - 70), awal, font=f_kaki, fill=REDUP)
+        draw.text((x + draw.textlength(awal, font=f_kaki), tinggi - 70), link, font=_huruf(28, 900), fill=KUNING)
 
-    kanvas.save(path_keluar, "JPEG", quality=92, optimize=True)
+    kanvas.convert("RGB").save(path_keluar, "JPEG", quality=92, optimize=True)
     return path_keluar
