@@ -8,40 +8,62 @@
           unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
         @font-face { font-family: "Archivo"; src: url(assets/fonts/archivo-latin-ext.woff2) format("woff2"); font-weight: 100 900; font-stretch: 62% 125%;
           unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2C60-2C7F, U+A720-A7FF; }
-        #{{ID}} { position: absolute; inset: 0; overflow: hidden; color: #eef1f7; font-family: "Archivo", system-ui, sans-serif; }
+        /* Huruf Jepang (Dela Gothic One, subset sama dengan situs: 割引 無料 本日特価 近日 セール ゲーム) */
+        @font-face { font-family: "Manga"; src: url(assets/fonts/dela-gothic-jp.woff2) format("woff2"); font-weight: 400; }
+        #{{ID}} { position: absolute; inset: 0; overflow: hidden; color: #f1f2f6; font-family: "Archivo", system-ui, sans-serif; }
         #{{ID}} .abs { position: absolute; }
-        #{{ID}} .lime { color: #b8f229; }
-        /* sampul game #1 mengintip: rotasi di pembungkus statis, gerak di dalamnya */
+        #{{ID}} .jp { font-family: "Manga", "Archivo", sans-serif; font-weight: 400; }
+        #{{ID}} .kuning { color: #f6e146; }
+        /* efek suara manga セール: katakana besar bergaris di belakang judul */
+        #{{ID}} .sfx-rot { left: -40px; top: 430px; transform: rotate(-7deg); }
+        #{{ID}}-sfx { display: block; font-size: 340px; line-height: 1; white-space: nowrap; color: #0a0b12; -webkit-text-stroke: 3px rgba(246, 225, 70, 0.2); opacity: 0; }
+        /* sampul game #1 mengintip dengan garis kecepatan di belakangnya: rotasi di pembungkus statis, gerak di dalamnya */
+        #{{ID}}-cepat { left: 180px; top: 733px; width: 1400px; height: 1400px; display: block; opacity: 0;
+          background: repeating-conic-gradient(from 3deg at 50% 50%, rgba(246, 225, 70, 0.16) 0deg 1.1deg, transparent 1.1deg 7deg);
+          -webkit-mask-image: radial-gradient(closest-side, transparent 38%, #000 52%, transparent 86%); mask-image: radial-gradient(closest-side, transparent 38%, #000 52%, transparent 86%); }
         #{{ID}} .cover-rot { left: 560px; top: 1250px; width: 640px; height: 366px; transform: rotate(-7deg); }
-        #{{ID}}-cover { display: block; width: 100%; height: 100%; border-radius: 26px; background-size: cover; background-position: center; opacity: 0; }
+        #{{ID}}-cover { display: block; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0;
+          clip-path: polygon(0 0, calc(100% - 36px) 0, 100% 36px, 100% 100%, 0 100%); }
         #{{ID}} .ghost-rot { left: 430px; top: 1560px; transform: rotate(-7deg); }
         #{{ID}}-ghost { display: block; overflow: visible; opacity: 0; }
-        #{{ID}}-logo { left: 72px; top: 230px; display: flex; align-items: center; gap: 22px; }
-        #{{ID}}-tag { display: block; width: 78px; height: 78px; }
-        #{{ID}} .wm { display: flex; font-size: 64px; font-weight: 900; font-stretch: 118%; letter-spacing: -0.005em; line-height: 1; }
+        /* Logo: label kuning miring 割 + GAMEDISKON sempit (sama dengan .logo di situs) */
+        #{{ID}}-logo { left: 72px; top: 230px; display: flex; align-items: center; gap: 26px; }
+        #{{ID}}-hanko { display: grid; place-items: center; width: 126px; height: 110px; flex: none; padding-top: 4px;
+          background: #f6e146; color: #0a0b12; font-size: 66px; line-height: 1; clip-path: polygon(22px 0, 100% 0, calc(100% - 22px) 100%, 0 100%); opacity: 0; }
+        #{{ID}} .wm { display: flex; font-size: 88px; font-weight: 900; font-stretch: 74%; letter-spacing: 0.01em; line-height: 1; }
         #{{ID}} .wm span { display: inline-block; opacity: 0; }
-        #{{ID}}-kicker { left: 72px; top: 470px; font-size: 40px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #b8f229; opacity: 0; }
-        #{{ID}}-judul { left: 72px; top: 540px; width: 860px; font-size: 140px; font-weight: 900; font-stretch: 118%; text-transform: uppercase; line-height: 0.98; letter-spacing: -0.005em; }
+        #{{ID}}-kicker { left: 72px; top: 480px; display: flex; align-items: center; gap: 22px; font-size: 40px; font-weight: 800; letter-spacing: 0.14em;
+          text-transform: uppercase; color: #f6e146; opacity: 0; }
+        #{{ID}}-kicker::before { content: ""; width: 64px; height: 20px; flex: none; background: #f6e146; clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%); }
+        /* Judul: huruf sempit miring; baris terakhir di atas blok kuning (seperti .sorot di situs) */
+        #{{ID}}-judul { left: 72px; top: 548px; width: 880px; font-size: 150px; font-weight: 900; font-stretch: 68%; text-transform: uppercase; line-height: 1; }
         #{{ID}}-judul .ln { display: block; opacity: 0; }
-        #{{ID}}-sub { left: 72px; top: 1010px; width: 760px; font-size: 54px; line-height: 1.3; color: #9ba5ba; opacity: 0; }
-        #{{ID}}-pill { left: 72px; top: 1200px; display: block; font-size: 46px; font-weight: 900; padding: 18px 34px; border-radius: 999px;
-          background: #ff4d8d; color: #0a0d13; box-shadow: 0 0 40px rgba(255, 77, 141, 0.5); transform-origin: 0% 50%; opacity: 0; }
-        #{{ID}}-tgl { left: 72px; top: 1460px; font-size: 46px; font-weight: 700; color: #9ba5ba; opacity: 0; }
+        #{{ID}}-judul .ln > b { display: inline-block; font-weight: inherit; transform: skewX(-8deg); transform-origin: bottom left; }
+        #{{ID}}-judul .ln > b.sorot { margin-top: 0.14em; padding: 0.06em 0.32em 0.02em 0.24em; background: #f6e146; color: #0a0b12;
+          clip-path: polygon(0.18em 0, 100% 0, calc(100% - 0.18em) 100%, 0 100%); }
+        #{{ID}}-sub { left: 72px; top: 1062px; width: 760px; font-size: 54px; line-height: 1.3; color: #a7acbe; opacity: 0; }
+        #{{ID}}-pill { left: 72px; top: 1236px; display: flex; align-items: center; gap: 18px; font-size: 46px; font-weight: 900; font-stretch: 85%; letter-spacing: 0.02em;
+          padding: 16px 46px 14px; background: #f6e146; color: #0a0b12; clip-path: polygon(20px 0, 100% 0, calc(100% - 20px) 100%, 0 100%);
+          transform-origin: 0% 50%; opacity: 0; }
+        #{{ID}}-pill .jp { font-size: 48px; letter-spacing: 0.02em; }
+        #{{ID}}-tgl { left: 72px; top: 1470px; font-size: 46px; font-weight: 700; color: #a7acbe; opacity: 0; }
       </style>
 
       <div id="{{ID}}" data-composition-id="{{ID}}" data-width="1080" data-height="1920">
+        <div class="abs sfx-rot" data-layout-allow-overflow=""><span id="{{ID}}-sfx" class="jp" aria-hidden="true" data-layout-allow-overflow="" data-layout-allow-overlap="">セール</span></div>
+        <div class="abs" id="{{ID}}-cepat" data-layout-allow-overflow=""></div>
         <div class="abs cover-rot" data-layout-allow-overflow=""><div id="{{ID}}-cover" data-layout-allow-overflow="" style="background-image: url('{{SAMPUL}}')"></div></div>
-        <div class="abs ghost-rot" data-layout-allow-overflow=""><svg id="{{ID}}-ghost" aria-hidden="true" data-layout-allow-overflow="" width="760" height="300" viewBox="0 0 760 300"><text x="0" y="250" font-family="Archivo, system-ui, sans-serif" font-size="280" font-weight="900" font-stretch="75%" fill="rgba(184,242,41,0.42)">-{{DISKON}}%</text></svg></div>
+        <div class="abs ghost-rot" data-layout-allow-overflow=""><svg id="{{ID}}-ghost" aria-hidden="true" data-layout-allow-overflow="" width="760" height="300" viewBox="0 0 760 300"><text x="0" y="250" font-family="Archivo, system-ui, sans-serif" font-size="280" font-weight="900" font-stretch="70%" fill="none" stroke="rgba(246,225,70,0.5)" stroke-width="4">-{{DISKON}}%</text></svg></div>
 
         <div class="abs" id="{{ID}}-logo">
-          <svg id="{{ID}}-tag" viewBox="0 0 24 24"><rect width="24" height="24" rx="5.3" fill="#b8f229" /><g transform="translate(4.56 4.56) scale(.62)" fill="none" stroke="#0a0d13" stroke-width="2.4" stroke-linejoin="round"><path d="M3 3H13L20.6 10.6Q21.4 12 20.6 13.4L13.4 20.6Q12 21.4 10.6 20.6L3 13Z" /><circle cx="7.5" cy="7.5" r="1.6" fill="#0a0d13" stroke="none" /></g></svg>
-          <div class="wm"><span id="{{ID}}-w1">GAME</span><span id="{{ID}}-w2" class="lime">DISKON</span></div>
+          <div id="{{ID}}-hanko" class="jp">割</div>
+          <div class="wm"><span id="{{ID}}-w1">GAME</span><span id="{{ID}}-w2" class="kuning">DISKON</span></div>
         </div>
         <div class="abs" id="{{ID}}-kicker">Diskon Steam&#160;&#160;{{TGL_PENDEK}}</div>
         <div class="abs" id="{{ID}}-judul">
-          <span class="ln" id="{{ID}}-l1">{{JUMLAH}} diskon</span>
-          <span class="ln" id="{{ID}}-l2">Steam</span>
-          <span class="ln lime" id="{{ID}}-l3">hari ini</span>
+          <span class="ln" id="{{ID}}-l1"><b>{{JUMLAH}} diskon</b></span>
+          <span class="ln" id="{{ID}}-l2"><b>Steam</b></span>
+          <span class="ln" id="{{ID}}-l3"><b class="sorot">hari ini</b></span>
         </div>
         <div class="abs" id="{{ID}}-sub">Harga Rupiah asli, dicek langsung ke Steam Indonesia.</div>
         {{PILL}}
@@ -55,16 +77,20 @@
           const tl = gsap.timeline({ paused: true });
           const m = D.mulai;
 
-          // Logo: tag spring-pop (power3, tanpa pantul), lalu wordmark waterfall
-          tl.fromTo(P + "tag", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, m + 0.05);
-          tl.set(P + "w1", { opacity: 1, y: 45 }, m + 0.18);
-          tl.to(P + "w1", { y: 0, duration: 0.16, ease: "power4.out" }, m + 0.18);
-          tl.set(P + "w2", { opacity: 1, y: 45 }, m + 0.32);
-          tl.to(P + "w2", { y: 0, duration: 0.16, ease: "power4.out" }, m + 0.32);
+          // Logo: label 割 dibanting (besar ke ukuran, power4: hantaman), lalu wordmark waterfall
+          tl.fromTo(P + "hanko", { scale: 1.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.28, ease: "power4.in" }, m + 0.05);
+          tl.set(P + "w1", { opacity: 1, y: 45 }, m + 0.22);
+          tl.to(P + "w1", { y: 0, duration: 0.16, ease: "power4.out" }, m + 0.22);
+          tl.set(P + "w2", { opacity: 1, y: 45 }, m + 0.36);
+          tl.to(P + "w2", { y: 0, duration: 0.16, ease: "power4.out" }, m + 0.36);
 
           tl.fromTo(P + "kicker", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.4, ease: "power3.out" }, m + 0.35);
 
-          // Judul: waterfall-entry — biner 0→1, baris terakhir (lime) paling jauh & paling akhir
+          // Efek suara セール menyapu masuk dari kiri lalu hanyut pelan
+          tl.fromTo(P + "sfx", { opacity: 0, x: -90 }, { opacity: 1, x: 0, duration: 0.7, ease: "power3.out" }, m + 0.3);
+          tl.to(P + "sfx", { x: 40, duration: Math.max(0.5, D.durasi - m - 1.0), ease: "none" }, m + 1.0);
+
+          // Judul: waterfall-entry — biner 0→1, baris terakhir (blok kuning) paling jauh & paling akhir
           const F = 1 / 60;
           let t = m + 0.45;
           [["l1", 80, 0.2], ["l2", 50, 0.16], ["l3", 75, 0.18]].forEach(([id, dy, d], i) => {
@@ -75,13 +101,15 @@
 
           tl.fromTo(P + "sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, m + 1.0);
           if (document.querySelector(P + "pill")) {
-            tl.fromTo(P + "pill", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, m + 1.25);
+            tl.fromTo(P + "pill", { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.4, ease: "power3.out" }, m + 1.25);
           }
           tl.fromTo(P + "tgl", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power1.out" }, m + 1.45);
 
-          // Sampul game #1 meluncur masuk lalu hanyut pelan; "-NN%" hantu naik pelan
-          tl.fromTo(P + "cover", { x: 300, opacity: 0 }, { x: 0, opacity: 0.38, duration: 1.0, ease: "power3.out" }, m + 0.3);
+          // Sampul game #1 meluncur masuk lalu hanyut pelan; garis kecepatan & "-NN%" bergaris ikut muncul
+          tl.fromTo(P + "cover", { x: 300, opacity: 0 }, { x: 0, opacity: 0.42, duration: 1.0, ease: "power3.out" }, m + 0.3);
           tl.to(P + "cover", { x: -40, duration: Math.max(0.5, D.durasi - m - 1.3), ease: "none" }, m + 1.3);
+          tl.fromTo(P + "cepat", { opacity: 0, scale: 0.85 }, { opacity: 1, scale: 1, duration: 0.9, ease: "power2.out" }, m + 0.4);
+          tl.to(P + "cepat", { rotation: 4, duration: Math.max(0.5, D.durasi - m - 1.3), ease: "none" }, m + 1.3);
           tl.fromTo(P + "ghost", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 1.2, ease: "power2.out" }, m + 0.6);
           tl.to(P + "ghost", { y: -30, duration: Math.max(0.5, D.durasi - m - 1.8), ease: "none" }, m + 1.8);
 

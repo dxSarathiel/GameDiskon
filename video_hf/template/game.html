@@ -8,36 +8,54 @@
           unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
         @font-face { font-family: "Archivo"; src: url(assets/fonts/archivo-latin-ext.woff2) format("woff2"); font-weight: 100 900; font-stretch: 62% 125%;
           unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2C60-2C7F, U+A720-A7FF; }
-        #{{ID}} { position: absolute; inset: 0; overflow: hidden; color: #eef1f7; font-family: "Archivo", system-ui, sans-serif; }
+        /* Huruf Jepang (Dela Gothic One, subset sama dengan situs) */
+        @font-face { font-family: "Manga"; src: url(assets/fonts/dela-gothic-jp.woff2) format("woff2"); font-weight: 400; }
+        #{{ID}} { position: absolute; inset: 0; overflow: hidden; color: #f1f2f6; font-family: "Archivo", system-ui, sans-serif; }
         /* Tumpukan di tengah layar, titik tengah sedikit di atas tengah (zona caption TikTok di bawah) */
         #{{ID}} .stack { position: absolute; inset: 0; padding: 110px 54px 330px; display: flex; flex-direction: column; justify-content: center; }
-        #{{ID}} .prog { display: flex; gap: 14px; }
-        #{{ID}} .seg { flex: 1; display: block; height: 10px; border-radius: 99px; background: #262f42; overflow: hidden; }
-        #{{ID}} .seg b { display: block; width: 100%; height: 100%; border-radius: 99px; background: #b8f229; transform-origin: 0% 50%; }
+        /* Progres: segmen jajar genjang ala menu game */
+        #{{ID}} .prog { display: flex; gap: 12px; }
+        #{{ID}} .seg { flex: 1; display: block; height: 14px; background: #262a3a; overflow: hidden; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+        #{{ID}} .seg b { display: block; width: 100%; height: 100%; background: #f6e146; transform-origin: 0% 50%; }
         #{{ID}} .seg.kosong b { transform: scaleX(0); }
-        #{{ID}}-kicker { margin: 30px 0 34px; font-size: 40px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #b8f229; opacity: 0; }
-        #{{ID}} .card { position: relative; border-radius: 40px; background: #121722; border: 3px solid #262f42; overflow: hidden; }
-        #{{ID}} .cover { position: relative; height: 557px; overflow: hidden; }
+        #{{ID}}-kicker { display: flex; align-items: center; gap: 22px; margin: 30px 0 34px; font-size: 40px; font-weight: 800; letter-spacing: 0.14em;
+          text-transform: uppercase; color: #f6e146; opacity: 0; }
+        #{{ID}}-kicker::before { content: ""; width: 64px; height: 20px; flex: none; background: #f6e146; clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%); }
+        /* Kartu: panel dengan pojok kanan atas dipotong (--sudut-potong di situs) */
+        #{{ID}} .card { position: relative; background: #12141e; overflow: hidden; clip-path: polygon(0 0, calc(100% - 44px) 0, 100% 44px, 100% 100%, 0 100%); }
+        #{{ID}}-garis { position: absolute; left: 0; bottom: 0; width: 100%; height: 8px; display: block; background: #f6e146; transform: scaleX(0.18); transform-origin: 0% 50%; }
+        #{{ID}} .cover { position: relative; height: 557px; overflow: hidden; background: #1b1e2b; }
         #{{ID}}-img { position: absolute; inset: -30px; display: block; background-size: cover; background-position: center; }
-        #{{ID}}-badge { position: absolute; left: 30px; top: 30px; display: block; font-size: 34px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-          padding: 12px 22px; border-radius: 999px; background: #0a0d13; color: #b8f229; border: 3px solid #b8f229; opacity: 0; transform-origin: 0% 50%; }
-        #{{ID}} .body { padding: 50px 100px 56px 54px; display: flex; flex-direction: column; gap: 34px; }
+        /* screentone di pojok kiri bawah sampul */
+        #{{ID}} .cover::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+          background: radial-gradient(circle, rgba(241, 242, 246, 0.24) 2.6px, transparent 3.8px) 0 0 / 16px 16px;
+          -webkit-mask-image: linear-gradient(35deg, #000, transparent 40%); mask-image: linear-gradient(35deg, #000, transparent 40%); }
+        /* label vertikal 本日特価 (harga spesial hari ini) di sisi kanan sampul */
+        #{{ID}}-noren { position: absolute; z-index: 1; right: 0; top: 70px; display: block; writing-mode: vertical-rl; text-orientation: upright;
+          padding: 28px 16px; background: #f6e146; color: #0a0b12; font-family: "Manga", "Archivo", sans-serif; font-size: 46px; letter-spacing: 0.16em; line-height: 1;
+          clip-path: polygon(0 0, 100% 14px, 100% 100%, 0 calc(100% - 14px)); opacity: 0; }
+        #{{ID}}-badge { position: absolute; z-index: 1; left: 30px; top: 30px; display: block; font-size: 34px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+          padding: 12px 36px 10px; background: #5be39a; color: #0a0b12; clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); opacity: 0; transform-origin: 0% 50%; }
+        #{{ID}} .body { padding: 50px 100px 64px 54px; display: flex; flex-direction: column; gap: 34px; }
         #{{ID}}-nama { font-size: 86px; font-weight: 800; line-height: 1.06; opacity: 0;
           display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-        #{{ID}} .rrow { display: flex; justify-content: space-between; align-items: baseline; font-size: 44px; color: #9ba5ba; }
-        #{{ID}}-rnum { font-size: 50px; font-weight: 900; font-stretch: 75%; font-variant-numeric: tabular-nums; color: #eef1f7; }
-        #{{ID}} .track { margin-top: 14px; height: 14px; border-radius: 99px; background: #262f42; overflow: hidden; }
-        #{{ID}}-rfill { display: block; width: 100%; height: 100%; border-radius: 99px; background: #5cd2ff; transform-origin: 0% 50%; }
+        #{{ID}} .rrow { display: flex; justify-content: space-between; align-items: baseline; font-size: 44px; color: #a7acbe; }
+        #{{ID}}-rnum { font-size: 50px; font-weight: 900; font-stretch: 75%; font-variant-numeric: tabular-nums; color: #f1f2f6; }
+        #{{ID}} .track { margin-top: 14px; height: 14px; background: #262a3a; overflow: hidden; }
+        #{{ID}}-rfill { display: block; width: 100%; height: 100%; background: #f1f2f6; transform-origin: 0% 50%; }
         #{{ID}}-rating { opacity: 0; }
-        #{{ID}} .harga { display: flex; align-items: center; gap: 30px; }
+        #{{ID}} .harga { display: flex; align-items: center; gap: 34px; }
         #{{ID}} .chip-wrap { position: relative; display: block; flex: none; }
-        #{{ID}}-burst { position: absolute; inset: -30px; display: block; border-radius: 999px; background: radial-gradient(closest-side, rgba(184, 242, 41, 0.55), rgba(184, 242, 41, 0)); opacity: 0; }
-        #{{ID}}-chip { position: relative; display: block; font-size: 96px; font-weight: 900; font-stretch: 75%; line-height: 1.15; padding: 16px 28px; border-radius: 999px;
-          background: #b8f229; color: #0a0d13; box-shadow: 0 0 40px rgba(184, 242, 41, 0.45); font-variant-numeric: tabular-nums; }
+        /* garis kejut manga di sekitar chip saat ditekan */
+        #{{ID}}-burst { position: absolute; inset: -120px; display: block; opacity: 0;
+          background: repeating-conic-gradient(from 3deg at 50% 50%, rgba(246, 225, 70, 0.6) 0deg 2deg, transparent 2deg 12deg);
+          -webkit-mask-image: radial-gradient(closest-side, transparent 48%, #000 62%, transparent 94%); mask-image: radial-gradient(closest-side, transparent 48%, #000 62%, transparent 94%); }
+        #{{ID}}-chip { position: relative; display: block; font-size: 96px; font-weight: 900; font-stretch: 75%; line-height: 1.15; padding: 14px 46px 12px;
+          background: #f6e146; color: #0a0b12; clip-path: polygon(22px 0, 100% 0, calc(100% - 22px) 100%, 0 100%); font-variant-numeric: tabular-nums; }
         #{{ID}} .hcol { display: block; }
         #{{ID}}-now { display: block; font-size: 134px; font-weight: 900; font-stretch: 75%; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; transform-origin: 0% 60%; }
-        #{{ID}} .was { position: relative; display: inline-block; margin-top: 8px; font-size: 46px; color: #9ba5ba; opacity: 0; }
-        #{{ID}}-strike { position: absolute; left: -4px; right: -4px; top: 52%; display: block; height: 4px; border-radius: 2px; background: #9ba5ba; transform-origin: 0% 50%; }
+        #{{ID}} .was { position: relative; display: inline-block; margin-top: 8px; font-size: 46px; color: #a7acbe; opacity: 0; }
+        #{{ID}}-strike { position: absolute; left: -4px; right: -4px; top: 52%; display: block; height: 4px; background: #a7acbe; transform-origin: 0% 50%; }
       </style>
 
       <div id="{{ID}}" data-composition-id="{{ID}}" data-width="1080" data-height="1920">
@@ -48,6 +66,7 @@
             <div class="cover">
               <div id="{{ID}}-img" data-layout-allow-overflow="" style="background-image: url('{{SAMPUL}}')"></div>
               {{BADGE}}
+              <div id="{{ID}}-noren" aria-hidden="true">本日特価</div>
             </div>
             <div class="body">
               <div id="{{ID}}-nama">{{JUDUL}}</div>
@@ -63,6 +82,7 @@
                 </div>
               </div>
             </div>
+            <i id="{{ID}}-garis"></i>
           </div>
         </div>
       </div>
@@ -82,6 +102,7 @@
           // Segmen progres ke-n terisi (stat-bars-and-fills, progress)
           tl.fromTo(P + "seg", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, m);
           tl.fromTo(P + "kicker", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.4, ease: "power3.out" }, m + 0.05);
+          tl.fromTo(P + "noren", { opacity: 0, x: 60 }, { opacity: 1, x: 0, duration: 0.35, ease: "power3.out" }, m + 0.25);
 
           // Nama: waterfall-entry (biner 0→1)
           tl.set(P + "nama", { opacity: 1, y: 50 }, m + 0.15);
@@ -110,9 +131,11 @@
           tl.fromTo(P + "was", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, t0 + 0.1);
           tl.fromTo(P + "strike", { scaleX: 0 }, { scaleX: 1, duration: 0.3, ease: "power2.out" }, t0 + turun - 0.25);
 
-          // Chip potongan: spring-pop, lalu ditekan sekali (press-release-spring) bila waktunya cukup
+          // Chip potongan: spring-pop, lalu ditekan sekali (press-release-spring) bila waktunya cukup;
+          // garis kuning di dasar kartu memanjang penuh (seperti kartu situs saat disorot)
           const tc = t0 + turun - 0.1;
           tl.fromTo(P + "chip", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: "power3.out" }, tc);
+          tl.fromTo(P + "garis", { scaleX: 0.18 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, tc);
           if (tc + 1.05 < D.durasi) {
             tl.to(P + "chip", { scale: 0.9, duration: 0.12, ease: "power1.in" }, tc + 0.5);
             tl.to(P + "chip", { scale: 1, duration: 0.45, ease: "back.out(2)" }, tc + 0.62);
