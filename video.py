@@ -2,7 +2,7 @@
 Video vertikal harian (1080x1920) untuk TikTok dan YouTube Shorts.
 
 Isi: pembuka, 3-5 diskon Steam terbaik, game gratis Epic (kalau ada), dan penutup ke situs.
-Tampilannya sama dengan situs: pita biru, label harga kuning, potongan merah.
+Tampilannya sama dengan situs (tema "Shonen Sale"): tinta gelap, satu aksen kuning, label miring 割.
 Selain video, dibuat juga naskah untuk suara TTS, judul, dan tagar yang siap disalin.
 
 Butuh: Pillow dan imageio-ffmpeg (ffmpeg ikut terpasang lewat pip, tidak perlu apt).
@@ -10,6 +10,7 @@ Video animasi (utama) butuh Node.js 22+ dan ffmpeg/ffprobe di PATH; lihat video_
 Kalau tidak tersedia, otomatis memakai video slide Pillow.
 """
 
+import math
 import os
 import random
 import re
@@ -20,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 import requests
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 WIB = timezone(timedelta(hours=7))
 HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
@@ -32,25 +33,26 @@ DURASI = {"pembuka": 2.6, "game": 3.2, "gratis": 3.2, "penutup": 3.4}
 TRANSISI = 0.35
 MAKS_GAME = 5
 
-# Warna tema "Dark Gaming" (sama dengan token di gaya.py)
-LATAR = (10, 13, 19)          # --latar
-PANEL = (18, 23, 34)          # --panel
-PANEL_2 = (25, 32, 48)        # --panel-2
-GARIS = (38, 47, 66)          # --garis
-TINTA = (238, 241, 247)       # --tinta
-REDUP = (155, 165, 186)       # --redup
-LIME = (184, 242, 41)         # --lime: diskon & aksi utama
-SIAN = (92, 210, 255)         # --sian: tautan
-MAGENTA = (255, 77, 141)      # --magenta: GRATIS & hitung mundur
-UNGU = (123, 97, 255)         # --ungu: cahaya latar
-KUNING = (255, 210, 63)       # --kuning
+# Warna tema "Shonen Sale" (sama dengan token di gaya.py): tinta gelap + satu aksen kuning
+LATAR = (10, 11, 18)          # --tinta
+PANEL = (18, 20, 30)          # --tinta-2
+PANEL_2 = (27, 30, 43)        # --tinta-3
+GARIS = (38, 42, 58)          # --garis
+TINTA = (241, 242, 246)       # --putih
+REDUP = (167, 172, 190)       # --redup
+KUNING = (246, 225, 70)       # --kuning: satu-satunya aksen (label, potongan, tombol)
+HIJAU = (91, 227, 154)        # --hijau: harga termurah (status, bukan hiasan)
 
-LEBAR_JUDUL = 118             # lebar huruf untuk judul (uppercase, lebar)
-SEMPIT = 75                   # lebar huruf untuk angka
+LEBAR_JUDUL = 74              # lebar huruf judul (--sempit di situs)
+SEMPIT = 74                   # lebar huruf untuk angka
+MIRING = 10                   # kemiringan judul dalam derajat (skewX di situs)
 
 FOLDER_FONT = "fonts"
 URL_FONT = "https://github.com/google/fonts/raw/main/ofl/archivo/Archivo%5Bwdth,wght%5D.ttf"
 FILE_FONT = os.path.join(FOLDER_FONT, "Archivo-variabel.ttf")
+# Huruf Jepang Dela Gothic One (subset situs: 割引 無料 本日特価 近日 セール ゲーム); ikut di repo
+_REPO = os.path.dirname(os.path.abspath(__file__))
+FILE_FONT_JP = [os.path.join(_REPO, "aset", "dela-gothic-jp.woff2"), os.path.join(_REPO, "dela-gothic-jp.woff2")]
 
 
 # ---------- Huruf ----------
@@ -71,6 +73,79 @@ def huruf(ukuran, tebal=900, lebar=68):
     except Exception:
         pass
     return f
+
+
+def huruf_jp(ukuran):
+    """Dela Gothic One untuk tanda Jepang; None kalau file tidak ada (hiasan Jepang dilewati)."""
+    for path in FILE_FONT_JP:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, ukuran)
+            except OSError:          # Pillow tanpa dukungan woff2
+                return None
+    return None
+
+
+# ---------- Bentuk khas tema ----------
+def _jajar(x, y, w, h, miring):
+    """Jajar genjang (--jajar di situs): sisi kiri & kanan miring."""
+    return [(x + miring, y), (x + w, y), (x + w - miring, y + h), (x, y + h)]
+
+
+def _sudut_potong(x, y, w, h, potong):
+    """Panel dengan pojok kanan atas dipotong (--sudut-potong di situs)."""
+    return [(x, y), (x + w - potong, y), (x + w, y + potong), (x + w, y + h), (x, y + h)]
+
+
+def _miringkan(img, derajat=MIRING):
+    """skewX: bagian atas bergeser ke kanan, poros di tengah tinggi. Mengembalikan (gambar, geser_kiri)."""
+    k = math.tan(math.radians(derajat))
+    w, h = img.size
+    tambah = int(k * h) + 2
+    hasil = Image.new("RGBA", (w + tambah, h), (0, 0, 0, 0))
+    hasil.paste(img, (tambah // 2, 0))
+    return hasil.transform(hasil.size, Image.AFFINE, (1, k, -k * h / 2, 0, 1, 0), Image.BICUBIC), tambah // 2
+
+
+def _sfx(kanvas, teks, ukuran, kanan, atas, sudut=8, alfa=70):
+    """Efek suara manga: huruf Jepang besar, hanya garis luar kuning transparan (seperti セール di situs)."""
+    f = huruf_jp(ukuran)
+    if not f:
+        return
+    tebal = max(3, ukuran // 70)
+    kiri_, atas_, kanan_, bawah_ = f.getbbox(teks, stroke_width=tebal)
+    ukuran_lapis = (kanan_ - kiri_ + 8, bawah_ - atas_ + 8)
+    luar, dalam = Image.new("L", ukuran_lapis, 0), Image.new("L", ukuran_lapis, 0)
+    xy = (4 - kiri_, 4 - atas_)
+    ImageDraw.Draw(luar).text(xy, teks, font=f, fill=255, stroke_width=tebal, stroke_fill=255)
+    ImageDraw.Draw(dalam).text(xy, teks, font=f, fill=255)
+    lapis = Image.new("RGBA", ukuran_lapis, KUNING + (0,))
+    lapis.putalpha(ImageChops.subtract(luar, dalam).point(lambda v: v * alfa // 255))
+    lapis = lapis.rotate(sudut, expand=True, resample=Image.BICUBIC)
+    x = int(kanan - lapis.width)
+    if x < 0:
+        lapis, x = lapis.crop((-x, 0, lapis.width, lapis.height)), 0
+    kanvas.alpha_composite(lapis, (x, int(atas)))
+
+
+def _ledakan(teks_jp, teks, ukuran):
+    """Gelembung ledakan manga kuning (seperti stempel 無料 di situs), sedikit diputar."""
+    img = Image.new("RGBA", (ukuran, ukuran), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    c, titik = ukuran / 2, []
+    for i in range(32):
+        a = math.radians(i * 360 / 32)
+        r = c * (0.98 if i % 2 == 0 else 0.76) * (0.94 if i % 4 == 2 else 1)
+        titik.append((c + r * math.cos(a), c + r * math.sin(a)))
+    d.polygon(titik, fill=KUNING)
+    jp = huruf_jp(int(ukuran * 0.27))
+    f = huruf(int(ukuran * (0.13 if jp else 0.2)), 900, 100)
+    if jp:
+        d.text((c, c - ukuran * 0.06), teks_jp, font=jp, fill=LATAR, anchor="mm")
+        d.text((c, c + ukuran * 0.17), teks, font=f, fill=LATAR, anchor="mm")
+    else:
+        d.text((c, c), teks, font=f, fill=LATAR, anchor="mm")
+    return img.rotate(10, resample=Image.BICUBIC)
 
 
 # ---------- Bantuan gambar ----------
@@ -128,87 +203,84 @@ def _rupiah(sen):
     return "Rp " + f"{sen // 100:,}".replace(",", ".")
 
 
-def _pill(teks, font, isi, latar, pad_x=26, pad_y=14, cahaya=None):
-    """Label berbentuk kapsul (seperti .stempel dan .potong di situs)."""
+def _label(teks, font, isi, latar, pad_x=26, pad_y=14):
+    """Label jajar genjang (seperti .potong dan tombol di situs). Mengembalikan (gambar, ruang=0)."""
     uk = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     kiri, atas, kanan, bawah = uk.textbbox((0, 0), teks, font=font)
-    w, h = int(kanan - kiri + pad_x * 2), int(bawah - atas + pad_y * 2)
-    ruang = 40 if cahaya else 0
-    img = Image.new("RGBA", (w + ruang * 2, h + ruang * 2), (0, 0, 0, 0))
-    if cahaya:
-        glow = Image.new("RGBA", img.size, (0, 0, 0, 0))
-        ImageDraw.Draw(glow).rounded_rectangle((ruang, ruang, ruang + w, ruang + h), radius=h // 2, fill=cahaya)
-        img.alpha_composite(glow.filter(ImageFilter.GaussianBlur(18)))
+    h = int(bawah - atas + pad_y * 2)
+    miring = int(h * 0.22)
+    w = int(kanan - kiri + pad_x * 2 + miring)
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((ruang, ruang, ruang + w, ruang + h), radius=h // 2, fill=latar)
-    d.text((ruang + pad_x - kiri, ruang + pad_y - atas), teks, font=font, fill=isi)
-    return img, ruang
+    d.polygon(_jajar(0, 0, w, h, miring), fill=latar)
+    d.text((pad_x + miring / 2 - kiri, pad_y - atas), teks, font=font, fill=isi)
+    return img, 0
 
 
 def _tempel(kanvas, img, x, y, ruang=0):
     kanvas.alpha_composite(img, (int(x - ruang), int(y - ruang)))
 
 
+_LATAR_JADI = {}
+
+
 def _latar(w=W, h=H, kuat=1.0):
-    """Latar gelap dengan cahaya ungu & lime yang lembut dan grid halus ala HUD (seperti pita di situs)."""
-    im = Image.new("RGBA", (w, h), LATAR + (255,))
-    cahaya = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    dc = ImageDraw.Draw(cahaya)
-    dc.ellipse((int(w * 0.35), int(-h * 0.18), int(w * 1.35), int(h * 0.42)), fill=UNGU + (int(95 * kuat),))
-    dc.ellipse((int(-w * 0.45), int(h * 0.72), int(w * 0.55), int(h * 1.25)), fill=LIME + (int(34 * kuat),))
-    im.alpha_composite(cahaya.filter(ImageFilter.GaussianBlur(min(w, h) // 6)))
-    grid = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    dg = ImageDraw.Draw(grid)
-    jarak = max(40, w // 24)
-    for x in range(0, w, jarak):
-        dg.line((x, 0, x, h), fill=(255, 255, 255, 12))
-    for y in range(0, h, jarak):
-        dg.line((0, y, w, y), fill=(255, 255, 255, 12))
-    topeng = Image.linear_gradient("L").resize((w, h)).point(lambda v: 255 - v)   # memudar ke bawah
-    grid.putalpha(Image.composite(grid.getchannel("A"), Image.new("L", (w, h), 0), topeng))
-    im.alpha_composite(grid)
-    return im
-
-
-def _ikon_tag(ukuran):
-    """Tanda logo: kotak lime membulat berisi ikon tag harga gelap (sama dengan favicon)."""
-    s = ukuran / 24
-    img = Image.new("RGBA", (ukuran, ukuran), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    d.rounded_rectangle((0, 0, ukuran - 1, ukuran - 1), radius=int(ukuran * 0.22), fill=LIME)
-    k = 0.62                         # tag menempati 62% kotak
-    o = ukuran * (1 - k) / 2
-    t = lambda x, y: (o + x * s * k, o + y * s * k)
-    titik = [t(3, 3), t(13, 3), t(20.6, 10.6), t(21.2, 12), t(20.6, 13.4), t(13.4, 20.6), t(12, 21.2), t(10.6, 20.6), t(3, 13), t(3, 3)]
-    d.line(titik, fill=LATAR, width=max(2, int(2.4 * s * k)), joint="curve")
-    cx, cy = t(7.5, 7.5); r = 1.6 * s * k
-    d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=LATAR)
-    return img
+    """Latar tinta gelap dengan garis kecepatan manga dan screentone titik di kanan atas (seperti hero situs)."""
+    kunci = (w, h, kuat)
+    if kunci not in _LATAR_JADI:
+        im = Image.new("RGBA", (w, h), LATAR + (255,))
+        garis = Image.new("L", (w, h), 0)
+        dg = ImageDraw.Draw(garis)
+        cx, cy = w * 0.8, h * 0.28
+        for i in range(60):
+            a = math.radians(i * 6 + (2 if i % 2 else 0))
+            lebar = 0.012 if i % 3 == 0 else 0.007
+            r1, r2 = w * 0.32, h * 1.3
+            dg.polygon([(cx + r1 * math.cos(a - lebar), cy + r1 * math.sin(a - lebar)),
+                        (cx + r2 * math.cos(a - lebar), cy + r2 * math.sin(a - lebar)),
+                        (cx + r2 * math.cos(a + lebar), cy + r2 * math.sin(a + lebar)),
+                        (cx + r1 * math.cos(a + lebar), cy + r1 * math.sin(a + lebar))],
+                       fill=int(255 * min(1.0, 0.6 * kuat)))
+        im.paste(GARIS + (255,), (0, 0, w, h), garis)
+        tone = Image.new("L", (w, h), 0)
+        dt = ImageDraw.Draw(tone)
+        for y in range(0, h, 14):
+            for x in range(0, w, 14):
+                dt.ellipse((x - 2, y - 2, x + 2, y + 2), fill=255)
+        arah = Image.new("L", (w, h), 0)
+        ImageDraw.Draw(arah).ellipse((int(w * 0.3), int(-h * 0.25), int(w * 1.4), int(h * 0.35)), fill=int(50 * kuat))
+        tone = ImageChops.multiply(tone, arah.filter(ImageFilter.GaussianBlur(w // 8)))
+        im.paste(TINTA + (255,), (0, 0, w, h), tone)
+        _LATAR_JADI[kunci] = im
+    return _LATAR_JADI[kunci].copy()
 
 
 def _logo(skala=1.0):
-    """Ikon tag + tulisan GAMEDISKON (DISKON berwarna lime), seperti di pita situs."""
-    f = huruf(int(64 * skala), 900, LEBAR_JUDUL)
-    ikon = _ikon_tag(int(78 * skala))
+    """Label kuning miring 割 + GAMEDISKON sempit (DISKON kuning), seperti .logo di situs."""
+    f = huruf(int(76 * skala), 900, LEBAR_JUDUL)
+    tinggi, lebar_label = int(80 * skala), int(92 * skala)
     uk = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     lg = uk.textlength("GAME", font=f); ld = uk.textlength("DISKON", font=f)
-    jarak = int(22 * skala)
-    img = Image.new("RGBA", (ikon.width + jarak + int(lg + ld) + 10, ikon.height), (0, 0, 0, 0))
-    img.alpha_composite(ikon, (0, 0))
+    jarak = int(20 * skala)
+    img = Image.new("RGBA", (lebar_label + jarak + int(lg + ld) + 10, tinggi), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    x = ikon.width + jarak
-    d.text((x, ikon.height / 2), "GAME", font=f, fill=TINTA, anchor="lm")
-    d.text((x + lg, ikon.height / 2), "DISKON", font=f, fill=LIME, anchor="lm")
+    d.polygon(_jajar(0, 0, lebar_label, tinggi, int(tinggi * 0.16)), fill=KUNING)
+    jp = huruf_jp(int(48 * skala))
+    if jp:
+        d.text((lebar_label / 2, tinggi / 2 + 2 * skala), "割", font=jp, fill=LATAR, anchor="mm")
+    x = lebar_label + jarak
+    d.text((x, tinggi / 2), "GAME", font=f, fill=TINTA, anchor="lm")
+    d.text((x + lg, tinggi / 2), "DISKON", font=f, fill=KUNING, anchor="lm")
     return img
 
 
 def _label_harga(potong, harga, coret, skala=1.0):
-    """Chip potongan lime + harga besar + harga coret (seperti .label-rak di situs)."""
+    """Label potongan kuning miring + harga besar + harga coret (seperti .label-rak di situs)."""
     f_potong = huruf(int(92 * skala), 900, SEMPIT)
     f_harga = huruf(int(128 * skala), 900, SEMPIT)
     f_coret = huruf(int(44 * skala), 500, 100)
     uk = ImageDraw.Draw(Image.new("RGB", (1, 1)))
-    chip, ruang = _pill(potong, f_potong, LATAR, LIME, int(26 * skala), int(16 * skala), cahaya=LIME + (110,)) if potong else (None, 0)
+    chip, ruang = _label(potong, f_potong, LATAR, KUNING, int(26 * skala), int(16 * skala)) if potong else (None, 0)
     lh = uk.textlength(harga, font=f_harga)
     tinggi = max(chip.height - 2 * ruang if chip else 0, int(150 * skala))
     lebar = (chip.width - 2 * ruang + int(30 * skala) if chip else 0) + int(max(lh, uk.textlength(coret or "", font=f_coret))) + 20
@@ -227,37 +299,59 @@ def _label_harga(potong, harga, coret, skala=1.0):
     return img, ruang
 
 
-def _kartu(kanvas, kotak, radius=40, garis=GARIS, isi=PANEL):
+def _kartu(kanvas, kotak, potong=44, garis=GARIS, isi=PANEL):
+    """Panel bersudut potong dengan garis kuning di sisi kiri (seperti kartu unggulan di situs)."""
     x, y, w, h = kotak
     d = ImageDraw.Draw(kanvas)
-    d.rounded_rectangle((x, y, x + w, y + h), radius=radius, fill=isi, outline=garis, width=3)
+    d.polygon(_sudut_potong(x, y, w, h, potong), fill=isi, outline=garis, width=3)
+    d.rectangle((x, y, x + 9, y + h), fill=KUNING)
 
 
-def _tempel_gambar_kartu(kanvas, img, kotak, radius=40):
-    """Gambar di bagian atas kartu: sudut atas membulat, sudut bawah lurus."""
+def _tempel_gambar_kartu(kanvas, img, kotak, potong=42):
+    """Gambar di bagian atas kartu, pojok kanan atas ikut dipotong."""
     x, y, w, h = kotak
     rasio = max(w / img.width, h / img.height)
     img = img.resize((int(img.width * rasio) + 1, int(img.height * rasio) + 1), Image.LANCZOS).convert("RGBA")
     kiri, atas = (img.width - w) // 2, (img.height - h) // 2
     img = img.crop((kiri, atas, kiri + w, atas + h))
     topeng = Image.new("L", (w, h), 0)
-    dt = ImageDraw.Draw(topeng)
-    dt.rounded_rectangle((0, 0, w, h + radius), radius=radius, fill=255)
+    ImageDraw.Draw(topeng).polygon(_sudut_potong(0, 0, w, h, potong), fill=255)
     kanvas.paste(img, (x, y), topeng)
 
 
-def _judul_besar(d, baris, x, y, ukuran, warna_akhir=LIME, jarak=None):
-    """Judul uppercase lebar; baris terakhir berwarna lime (seperti gradasi judul di situs)."""
-    # Kecilkan otomatis sampai baris terpanjang muat sebelum area tombol TikTok di kanan
+def _judul_besar(kanvas, baris, x, y, ukuran, jarak=None):
+    """Judul uppercase sempit yang miring; baris terakhir di pita kuning (seperti judul beranda situs)."""
+    uk = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    # Kecilkan otomatis sampai semua baris (termasuk pita) muat sebelum area tombol TikTok di kanan
     while ukuran > 60:
         f = huruf(ukuran, 900, LEBAR_JUDUL)
-        if max(d.textlength(b.upper(), font=f) for b in baris) <= KANAN_AMAN - x:
+        lebar = [uk.textlength(b.upper(), font=f) for b in baris]
+        lebar[-1] += ukuran * 0.75
+        if max(lebar) + ukuran * 0.25 <= KANAN_AMAN - x:
             break
         ukuran -= 4
-    jarak = jarak or int(ukuran * 0.98)
+    jarak = jarak or int(ukuran * 1.02)
     for i, b in enumerate(baris):
-        d.text((x, y), b.upper(), font=f, fill=warna_akhir if i == len(baris) - 1 else TINTA)
-        y += jarak
+        teks = b.upper()
+        kiri, atas, kanan, bawah = f.getbbox(teks)
+        if i < len(baris) - 1:
+            lapis = Image.new("RGBA", (int(kanan) + 8, int(bawah + ukuran * 0.1)), (0, 0, 0, 0))
+            ImageDraw.Draw(lapis).text((0, 0), teks, font=f, fill=TINTA)
+            lapis, geser = _miringkan(lapis)
+            kanvas.alpha_composite(lapis, (int(x - geser), int(y)))
+            y += jarak
+        else:
+            px, py = int(ukuran * 0.26), int(ukuran * 0.13)
+            h = int(bawah - atas + py * 2)
+            m = int(h * 0.22)
+            w = int(kanan - kiri + px * 2 + m)
+            pita = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            dp = ImageDraw.Draw(pita)
+            dp.polygon(_jajar(0, 0, w, h, m), fill=KUNING)
+            dp.text((px + m / 2 - kiri, py - atas), teks, font=f, fill=LATAR)
+            pita, geser = _miringkan(pita)
+            kanvas.alpha_composite(pita, (int(x - geser - px // 4), int(y + atas - py)))
+            y += jarak + py
     return y
 
 
@@ -265,10 +359,14 @@ def _tanggal(dt):
     return f"{HARI[dt.weekday()]}, {dt.day} {BULAN[dt.month - 1]} {dt.year}"
 
 
-def _kicker(d, teks, x, y, warna=LIME, ukuran=40):
-    """Label kecil uppercase berjarak huruf lebar (seperti .unggulan-ket di situs)."""
+def _kicker(d, teks, x, y, warna=KUNING, ukuran=40):
+    """Label kecil uppercase berjarak huruf lebar, diawali balok miring (seperti .kicker di situs)."""
     f = huruf(ukuran, 800, 100)
-    cx = x
+    _, atas, _, bawah = f.getbbox("A")
+    bw, bh = int(ukuran * 1.1), int(ukuran * 0.38)
+    by = y + (atas + bawah) / 2 - bh / 2
+    d.polygon(_jajar(x, by, bw, bh, int(bh * 0.6)), fill=warna)
+    cx = x + bw + int(ukuran * 0.4)
     for ch in teks.upper():
         d.text((cx, y), ch, font=f, fill=warna)
         cx += d.textlength(ch, font=f) + ukuran * 0.12
@@ -283,17 +381,19 @@ BAWAH_AMAN = H - 380       # hindari keterangan TikTok di bawah
 
 def slide_pembuka(jumlah, sekarang, ada_gratis):
     im = _latar(kuat=1.2)
+    _sfx(im, "セール", 320, W + 30, 380)
+    im.alpha_composite(_logo(1.0), (TEPI, 230))
     d = ImageDraw.Draw(im)
-    logo = _logo(1.0)
-    im.alpha_composite(logo, (TEPI, 230))
     _kicker(d, f"Diskon Steam  {sekarang.day} {BULAN[sekarang.month - 1]}", TEPI, 470)
-    y = _judul_besar(d, [f"{jumlah} diskon", "Steam", "hari ini"], TEPI, 540, 170)
+    y = _judul_besar(im, [f"{jumlah} diskon", "Steam", "hari ini"], TEPI, 550, 170)
+    d = ImageDraw.Draw(im)
     f = huruf(54, 500, 100)
     d.text((TEPI, y + 50), "Harga Rupiah asli, dicek langsung", font=f, fill=REDUP)
     d.text((TEPI, y + 120), "ke Steam Indonesia.", font=f, fill=REDUP)
     if ada_gratis:
-        p, r = _pill("+ GAME GRATIS", huruf(46, 900, 100), LATAR, MAGENTA, 34, 18, cahaya=MAGENTA + (120,))
+        p, r = _label("+ GAME GRATIS", huruf(46, 900, 100), LATAR, KUNING, 34, 18)
         _tempel(im, p, TEPI, y + 250, r)
+        d = ImageDraw.Draw(im)
     d.text((TEPI, BAWAH_AMAN - 40), _tanggal(sekarang), font=huruf(46, 700, 100), fill=REDUP)
     return im.convert("RGB")
 
@@ -303,7 +403,7 @@ def _progres(d, nomor, total, y):
     lebar = (KANAN_AMAN - TEPI - (total - 1) * 14) / total
     for i in range(total):
         x = TEPI + i * (lebar + 14)
-        d.rounded_rectangle((x, y, x + lebar, y + 10), radius=5, fill=LIME if i < nomor else GARIS)
+        d.polygon(_jajar(x, y, lebar, 12, 6), fill=KUNING if i < nomor else GARIS)
 
 
 def slide_game(g, nomor, total, session=None):
@@ -331,7 +431,7 @@ def slide_game(g, nomor, total, session=None):
     d.text((kartu_x + 50, y + 14), f"{g['rating']} ulasan positif di Steam", font=huruf(46, 500, 100), fill=REDUP)
     y += 90
     if g.get("terendah_sejak"):
-        _kicker(d, "Termurah sejak dipantau", kartu_x + 50, y, LIME, 36)
+        _kicker(d, "Termurah sejak dipantau", kartu_x + 50, y, HIJAU, 36)
         y += 70
     label, r = _label_harga(f"-{g['diskon']}%", _rupiah(g["harga_akhir"]), _rupiah(g["harga_awal"]), 1.0)
     _tempel(im, label, kartu_x + 44, y + 30, r)
@@ -341,7 +441,7 @@ def slide_game(g, nomor, total, session=None):
 def slide_gratis(g, session=None):
     im = _latar(kuat=0.8)
     d = ImageDraw.Draw(im)
-    _kicker(d, "Gratis di Epic Games Store", TEPI, 235, MAGENTA)
+    _kicker(d, "Gratis di Epic Games Store", TEPI, 235)
     gambar = _unduh(g["gambar"], session) if g.get("gambar") else None
     kartu_x, kartu_w = TEPI - 12, KANAN_AMAN - TEPI + 60
     gambar_h = int(kartu_w * 9 / 16)
@@ -349,38 +449,38 @@ def slide_gratis(g, session=None):
     f_nama = huruf(84, 800, 100)
     baris_nama = _bungkus(d, g["judul"], f_nama, kartu_w - 100, 3)
     isi_h = 60 + len(baris_nama) * 92 + 330
-    _kartu(im, (kartu_x, y0, kartu_w, gambar_h + isi_h), garis=(90, 40, 64))
+    _kartu(im, (kartu_x, y0, kartu_w, gambar_h + isi_h))
     if gambar:
         _tempel_gambar_kartu(im, gambar, (kartu_x + 3, y0 + 3, kartu_w - 6, gambar_h))
-    stempel, r = _pill("GRATIS", huruf(48, 900, 100), LATAR, MAGENTA, 30, 16, cahaya=MAGENTA + (140,))
-    _tempel(im, stempel, kartu_x + 36, y0 + 36, r)
+    im.alpha_composite(_ledakan("無料", "GRATIS", 250), (kartu_x - 20, y0 - 40))
     d = ImageDraw.Draw(im)
     y = y0 + gambar_h + 55
     for b in baris_nama:
         d.text((kartu_x + 50, y), b, font=f_nama, fill=TINTA)
         y += 92
     d.text((kartu_x + 50, y + 30), "Klaim sebelum", font=huruf(46, 500, 100), fill=REDUP)
-    d.text((kartu_x + 50, y + 95), g["berakhir"], font=huruf(96, 900, SEMPIT), fill=MAGENTA)
+    d.text((kartu_x + 50, y + 95), g["berakhir"], font=huruf(96, 900, SEMPIT), fill=KUNING)
     d.text((kartu_x + 50, y + 225), "Sekali klaim, jadi milikmu selamanya.", font=huruf(42, 500, 100), fill=TINTA)
     return im.convert("RGB")
 
 
 def slide_penutup(username_bot, link_channel):
     im = _latar(kuat=1.2)
-    d = ImageDraw.Draw(im)
+    _sfx(im, "割引", 300, W + 30, 1520)
     im.alpha_composite(_logo(1.0), (TEPI, 300))
-    y = _judul_besar(d, ["Daftar", "lengkap +", "riwayat", "harga"], TEPI, 500, 130)
-    tombol, r = _pill("gamediskon.my.id", huruf(66, 900, 100), LATAR, LIME, 44, 26, cahaya=LIME + (120,))
+    y = _judul_besar(im, ["Daftar", "lengkap +", "riwayat", "harga"], TEPI, 500, 130)
+    tombol, r = _label("gamediskon.my.id", huruf(66, 900, 100), LATAR, KUNING, 44, 26)
     _tempel(im, tombol, TEPI, y + 50, r)
+    d = ImageDraw.Draw(im)
     y += 260
     f_ket, f_isi = huruf(46, 500, 100), huruf(76, 900, SEMPIT)
     if username_bot:
         d.text((TEPI, y), "Alarm harga di Telegram", font=f_ket, fill=REDUP)
-        d.text((TEPI, y + 62), f"@{username_bot}", font=f_isi, fill=SIAN)
+        d.text((TEPI, y + 62), f"@{username_bot}", font=f_isi, fill=KUNING)
         y += 200
     if link_channel:
         d.text((TEPI, y), "Info diskon harian", font=f_ket, fill=REDUP)
-        d.text((TEPI, y + 62), link_channel, font=f_isi, fill=SIAN)
+        d.text((TEPI, y + 62), link_channel, font=f_isi, fill=KUNING)
     return im.convert("RGB")
 
 
