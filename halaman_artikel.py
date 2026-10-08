@@ -8,7 +8,7 @@ Cara menulis artikel baru:
        ---
        judul: Judul yang tampil di halaman dan di Google
        deskripsi: Satu-dua kalimat ringkasan (tampil di hasil pencarian Google)
-       tanggal: 2026-09-27
+       tanggal: 2026-09-27         (tanggal di masa depan = terjadwal: terbit otomatis mulai tanggal itu, WIB)
        diperbarui: 2026-10-05      (opsional, isi kalau artikel diubah isinya)
        draf: ya                    (opsional; selama "ya", artikel TIDAK diterbitkan)
        ---
@@ -22,7 +22,7 @@ game gratis Epic yang sedang berlaku hari itu.
 
 import glob
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from html import escape
 
 import markdown
@@ -32,6 +32,7 @@ from halaman_game import _jejak_sederhana, _kerangka, _tgl, _tulis_jika_berubah
 
 FOLDER_ARTIKEL = "artikel"
 PENULIS = "Sarathiel"
+WIB = timezone(timedelta(hours=7))
 
 CSS_ARTIKEL = """
   .prosa { max-width: 68ch; }
@@ -90,6 +91,9 @@ def _artikel_valid(path):
                 datetime.strptime(kepala[k], "%Y-%m-%d")
     except ValueError:
         print(f"Artikel {path} dilewati: format tanggal harus TTTT-BB-HH, misalnya 2026-09-27.")
+        return None
+    if kepala["tanggal"] > datetime.now(WIB).strftime("%Y-%m-%d"):
+        print(f"Artikel {path} dijadwalkan terbit {kepala['tanggal']} (WIB), belum diterbitkan.")
         return None
     return {"slug": slug, "judul": kepala["judul"], "deskripsi": kepala["deskripsi"],
             "tanggal": kepala["tanggal"], "diperbarui": kepala.get("diperbarui") or kepala["tanggal"],

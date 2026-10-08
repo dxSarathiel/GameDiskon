@@ -119,7 +119,7 @@ CSS_PROSA = """
   .prosa p, .prosa ul { margin: 0 0 1rem; }
   .prosa ul { padding-left: 1.2rem; }
   .prosa li { margin-bottom: .35rem; }
-  .prosa a { color: var(--oranye); text-underline-offset: 3px; }
+  .prosa a { color: var(--kuning); text-underline-offset: 3px; }
 """
 
 
