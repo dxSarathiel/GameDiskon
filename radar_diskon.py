@@ -111,6 +111,7 @@ GOOGLE_VERIFIKASI = "NeGuLjS_j7yta3znaeJWo-JRiksuR9yDI_F7atB-RqU" # isi kode dar
 EVENT_SALE = [
     {"nama": "Steam Autumn Sale 2026", "mulai": "2026-10-01", "selesai": "2026-10-08", "emoji": "🍂",
      "artikel": "/panduan/persiapan-steam-autumn-sale-2026/"},   # panduan terkait (opsional)
+    {"nama": "Steam Scream V Fest 2026", "mulai": "2026-10-26", "selesai": "2026-11-02", "emoji": "🎃"},
     {"nama": "Steam Winter Sale 2026", "mulai": "2026-12-17", "selesai": "2027-01-04", "emoji": "❄️"},
 ]
 HARI_PENGUMUMAN_EVENT = 3   # mulai diumumkan sekian hari sebelum event
