@@ -26,6 +26,12 @@ BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
 HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 MAKS_ITEM_HALAMAN = 60
 
+# Efek suara manga di belakang judul beranda: サラシエル (nickname pengelola), digambar sebagai
+# garis vektor (huruf Dela Gothic One, OFL) supaya langsung tampil tanpa menunggu file huruf.
+# Bukan teks, jadi tidak dihitung browser sebagai "isi utama" (LCP) dan tidak memperlambat skor.
+SFX_SVG = ('<svg viewBox="36 -780 4954 803" focusable="false">'
+           '<path d="M964 -675V-460H873Q868 -299 788 -201Q709 -103 582 -56Q455 -8 280 14Q244 -58 206 -116Q167 -173 112 -224Q285 -227 390 -251Q496 -275 550 -326Q603 -376 612 -460H399V-294H139V-460H36V-675H139V-762H399V-675H593Q588 -701 573 -762H832L850 -675Z M1108 -759H1881V-602H1108ZM1863 -567 1975 -409Q1912 -281 1816 -199Q1721 -117 1574 -66Q1426 -16 1200 16Q1180 -41 1148 -106Q1115 -171 1076 -223Q1518 -234 1649 -361Q1285 -361 1071 -351V-567Z M2505 -516Q2437 -541 2346 -559Q2256 -577 2118 -592Q2131 -638 2141 -690Q2151 -742 2155 -780Q2402 -752 2550 -684ZM2023 -243Q2210 -243 2332 -268Q2455 -292 2543 -348Q2623 -399 2667 -495Q2711 -591 2728 -738Q2788 -717 2846 -702Q2905 -686 2990 -666Q2966 -480 2900 -364Q2833 -248 2717 -166Q2613 -92 2474 -52Q2335 -12 2130 7Q2108 -74 2086 -130Q2065 -185 2023 -243ZM2420 -315Q2334 -335 2244 -344Q2153 -353 2045 -353Q2050 -400 2050 -450Q2050 -499 2045 -552Q2165 -547 2262 -534Q2359 -520 2450 -496Z M3631 -484V-287H3963V-68H3037V-287H3369V-484H3079V-694H3921V-484Z M4990 -180Q4922 -128 4841 -86Q4760 -43 4638 6L4493 -93Q4495 -173 4495 -356Q4495 -607 4490 -748L4734 -754Q4730 -586 4730 -484Q4730 -422 4732 -304Q4779 -324 4826 -354Q4874 -384 4929 -434Q4942 -316 4990 -180ZM4437 -716Q4440 -666 4444 -579Q4447 -492 4447 -432Q4447 -400 4446 -388Q4438 -228 4360 -124Q4283 -19 4118 23Q4088 -42 4050 -104Q4011 -167 3967 -211Q4092 -220 4144 -268Q4195 -315 4195 -398Q4195 -523 4188 -590Q4182 -658 4167 -710Z"/></svg>')
+
 # Judul dan meta deskripsi beranda (tampil di tab browser dan hasil pencarian Google).
 # Ubah di sini kalau ingin merevisinya lagi.
 # Judul di bawah 60 karakter supaya tidak terpotong di Google; kata kunci utama di depan.
@@ -312,7 +318,7 @@ def buat_halaman(epic, steam, folder="docs", link_telegram="", nama_channel="",
       </a>"""
     hero = f"""
     <div class="hero">
-      <span class="sfx" lang="ja" aria-hidden="true">セール</span>
+      <span class="sfx" aria-hidden="true">{SFX_SVG}</span>
       <div class="hero-judul">
         <p class="kicker">{kicker}</p>
         <h1><span class="baris">Diskon Steam hari ini,</span> <span class="sorot">dalam Rupiah</span></h1>

@@ -26,7 +26,7 @@ FOLDER_ASET = os.path.join(FOLDER_REPO, "aset")   # kalau file ada di akar repo 
 FILE_ASET = {                      # nama di aset/ -> alamat di situs
     "archivo-latin.woff2": "fonts/archivo-latin.woff2",
     "archivo-latin-ext.woff2": "fonts/archivo-latin-ext.woff2",
-    "dela-gothic-jp.woff2": "fonts/dela-gothic-jp.woff2",   # huruf Jepang (Dela Gothic One, OFL), subset 15 huruf
+    "dela-gothic-jp.woff2": "fonts/dela-gothic-jp.woff2",   # huruf Jepang (Dela Gothic One, OFL), subset 19 huruf
     "og-gamediskon.png": "og-gamediskon.png",
 }
 FONT_PRELOAD = ["/fonts/archivo-latin.woff2", "/fonts/dela-gothic-jp.woff2"]
@@ -46,8 +46,8 @@ CSS = r"""
   src: url(/fonts/archivo-latin.woff2) format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
-/* Huruf Jepang untuk label & efek suara manga (Dela Gothic One, OFL). Subset 15 huruf, 3 KB:
-   割引 無料 本日特価 近日 セール ゲーム. Kalau menambah huruf baru, unduh ulang subset-nya. */
+/* Huruf Jepang untuk label & efek suara manga (Dela Gothic One, OFL). Subset 19 huruf, 3 KB:
+   割引 無料 本日特価 近日 セール ゲーム サラシエル. Kalau menambah huruf baru, unduh ulang subset-nya. */
 @font-face {
   font-family: "Manga"; font-style: normal; font-weight: 400; font-display: swap;
   src: url(/fonts/dela-gothic-jp.woff2) format("woff2");
@@ -168,12 +168,14 @@ a:hover { color: var(--putih); text-decoration-thickness: 2px; }
 }
 .hero-judul { grid-column: 1; grid-row: 1; align-self: end; }
 .hero-teks { grid-column: 1; grid-row: 2; }
-/* efek suara manga セール: katakana besar bergaris di belakang judul */
+/* efek suara manga サラシエル: katakana besar bergaris di belakang judul (SVG, lihat halaman.py) */
 .sfx {
   position: absolute; z-index: -1; left: -1.5rem; top: .5rem; pointer-events: none; user-select: none;
   font-size: clamp(7rem, 15vw, 13rem); line-height: 1; letter-spacing: -.02em; white-space: nowrap;
   color: transparent; -webkit-text-stroke: 1.5px rgba(246, 225, 70, .16); transform: rotate(-7deg);
 }
+.sfx svg { display: block; height: .8em; width: auto; overflow: visible; }
+.sfx path { fill: none; stroke: rgba(246, 225, 70, .16); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
 .hero > :not(.sfx) { animation: masuk 650ms cubic-bezier(.16, 1, .3, 1) both; }
 .hero-teks { animation-delay: 90ms !important; }
 .unggulan { animation-delay: 160ms !important; }
