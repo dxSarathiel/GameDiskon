@@ -675,6 +675,28 @@ def buat_suara(segmen, ada_gratis, session=None):
     return suara
 
 
+BATAS_TELEGRAM_MB = 45      # bot Telegram hanya bisa mengunggah file sampai 50 MB; sisakan ruang aman
+
+
+def _muat_telegram(path, durasi):
+    """Kalau video lebih besar dari batas unggah bot Telegram, kompres ulang supaya muat.
+    Kualitas dijaga dengan CRF, ukuran dibatasi dengan maxrate yang dihitung dari durasi."""
+    ukuran = os.path.getsize(path)
+    print(f"Ukuran video: {ukuran / 1048576:.1f} MB")
+    if ukuran <= BATAS_TELEGRAM_MB * 1048576:
+        return
+    bit_audio = 128_000
+    bit_video = int(BATAS_TELEGRAM_MB * 0.9 * 8 * 1048576 / max(durasi, 1)) - bit_audio
+    sementara = path + ".kecil.mp4"
+    subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", path,
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                    "-maxrate", str(bit_video), "-bufsize", str(bit_video * 2), "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", sementara], check=True)
+    os.replace(sementara, path)
+    print(f"Video dikompres ulang supaya muat di Telegram: {ukuran / 1048576:.1f} MB -> "
+          f"{os.path.getsize(path) / 1048576:.1f} MB")
+
+
 def rakit_mp4_hyperframes(steam, epic, segmen, sekarang, username_bot, link_channel, path_mp4, session=None, suara=None):
     """Isi template HyperFrames dengan data hari ini (dan suara TTS bila ada), lalu render.
     Kembalikan (durasi, dengan_suara). Melempar exception kalau ada yang gagal."""
@@ -732,6 +754,7 @@ def rakit_mp4_hyperframes(steam, epic, segmen, sekarang, username_bot, link_chan
                         "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
                         "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "64k",
                         "-shortest", "-movflags", "+faststart", path_mp4], check=True)
+    _muat_telegram(path_mp4, hasil["durasi"])
     return hasil["durasi"], hasil["dengan_suara"]
 
 
