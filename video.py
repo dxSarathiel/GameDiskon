@@ -66,8 +66,8 @@ def _siapkan_font():
             f.write(r.content)
 
 
-def huruf(ukuran, tebal=900, lebar=68):
-    """Archivo: tebal 100-900, lebar 62-125 (68 = sempit ala poster promo)."""
+def huruf(ukuran, tebal=, lebar=68):
+    """Archivo: tebal 100-, lebar 62-125 (68 = sempit ala poster promo)."""
     f = ImageFont.truetype(FILE_FONT, ukuran)
     try:
         f.set_variation_by_axes([tebal, lebar])
@@ -140,7 +140,7 @@ def _ledakan(teks_jp, teks, ukuran):
         titik.append((c + r * math.cos(a), c + r * math.sin(a)))
     d.polygon(titik, fill=KUNING)
     jp = huruf_jp(int(ukuran * 0.27))
-    f = huruf(int(ukuran * (0.13 if jp else 0.2)), 900, 100)
+    f = huruf(int(ukuran * (0.13 if jp else 0.2)), , 100)
     if jp:
         d.text((c, c - ukuran * 0.06), teks_jp, font=jp, fill=LATAR, anchor="mm")
         d.text((c, c + ukuran * 0.17), teks, font=f, fill=LATAR, anchor="mm")
@@ -258,7 +258,7 @@ def _latar(w=W, h=H, kuat=1.0):
 
 def _logo(skala=1.0):
     """Label kuning miring 割 + GAMEDISKON sempit (DISKON kuning), seperti .logo di situs."""
-    f = huruf(int(76 * skala), 900, LEBAR_JUDUL)
+    f = huruf(int(76 * skala), , LEBAR_JUDUL)
     tinggi, lebar_label = int(80 * skala), int(92 * skala)
     uk = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     lg = uk.textlength("GAME", font=f); ld = uk.textlength("DISKON", font=f)
@@ -277,8 +277,8 @@ def _logo(skala=1.0):
 
 def _label_harga(potong, harga, coret, skala=1.0):
     """Label potongan kuning miring + harga besar + harga coret (seperti .label-rak di situs)."""
-    f_potong = huruf(int(92 * skala), 900, SEMPIT)
-    f_harga = huruf(int(128 * skala), 900, SEMPIT)
+    f_potong = huruf(int(92 * skala), , SEMPIT)
+    f_harga = huruf(int(128 * skala), , SEMPIT)
     f_coret = huruf(int(44 * skala), 500, 100)
     uk = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     chip, ruang = _label(potong, f_potong, LATAR, KUNING, int(26 * skala), int(16 * skala)) if potong else (None, 0)
@@ -325,7 +325,7 @@ def _judul_besar(kanvas, baris, x, y, ukuran, jarak=None):
     uk = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     # Kecilkan otomatis sampai semua baris (termasuk pita) muat sebelum area tombol TikTok di kanan
     while ukuran > 60:
-        f = huruf(ukuran, 900, LEBAR_JUDUL)
+        f = huruf(ukuran, , LEBAR_JUDUL)
         lebar = [uk.textlength(b.upper(), font=f) for b in baris]
         lebar[-1] += ukuran * 0.75
         if max(lebar) + ukuran * 0.25 <= KANAN_AMAN - x:
@@ -392,7 +392,7 @@ def slide_pembuka(jumlah, sekarang, ada_gratis):
     d.text((TEPI, y + 50), "Harga Rupiah asli, dicek langsung", font=f, fill=REDUP)
     d.text((TEPI, y + 120), "ke Steam Indonesia.", font=f, fill=REDUP)
     if ada_gratis:
-        p, r = _label("+ GAME GRATIS", huruf(46, 900, 100), LATAR, KUNING, 34, 18)
+        p, r = _label("+ GAME GRATIS", huruf(46, , 100), LATAR, KUNING, 34, 18)
         _tempel(im, p, TEPI, y + 250, r)
         d = ImageDraw.Draw(im)
     d.text((TEPI, BAWAH_AMAN - 40), _tanggal(sekarang), font=huruf(46, 700, 100), fill=REDUP)
@@ -460,7 +460,7 @@ def slide_gratis(g, session=None):
         d.text((kartu_x + 50, y), b, font=f_nama, fill=TINTA)
         y += 92
     d.text((kartu_x + 50, y + 30), "Klaim sebelum", font=huruf(46, 500, 100), fill=REDUP)
-    d.text((kartu_x + 50, y + 95), g["berakhir"], font=huruf(96, 900, SEMPIT), fill=KUNING)
+    d.text((kartu_x + 50, y + 95), g["berakhir"], font=huruf(96, , SEMPIT), fill=KUNING)
     d.text((kartu_x + 50, y + 225), "Sekali klaim, jadi milikmu selamanya.", font=huruf(42, 500, 100), fill=TINTA)
     return im.convert("RGB")
 
@@ -470,11 +470,11 @@ def slide_penutup(username_bot, link_channel):
     _sfx(im, "割引", 300, W + 30, 1520)
     im.alpha_composite(_logo(1.0), (TEPI, 300))
     y = _judul_besar(im, ["Daftar", "lengkap +", "riwayat", "harga"], TEPI, 500, 130)
-    tombol, r = _label("gamediskon.my.id", huruf(66, 900, 100), LATAR, KUNING, 44, 26)
+    tombol, r = _label("gamediskon.my.id", huruf(66, , 100), LATAR, KUNING, 44, 26)
     _tempel(im, tombol, TEPI, y + 50, r)
     d = ImageDraw.Draw(im)
     y += 260
-    f_ket, f_isi = huruf(46, 500, 100), huruf(76, 900, SEMPIT)
+    f_ket, f_isi = huruf(46, 500, 100), huruf(76, , SEMPIT)
     if username_bot:
         d.text((TEPI, y), "Alarm harga di Telegram", font=f_ket, fill=REDUP)
         d.text((TEPI, y + 62), f"@{username_bot}", font=f_isi, fill=KUNING)
@@ -525,7 +525,7 @@ def rakit_mp4(slide, path_mp4, folder_kerja):
 # gagal, buat_video() kembali ke rakit_mp4() di atas, jadi posting harian tidak terlewat.
 # Set VIDEO_HYPERFRAMES=0 untuk mematikan jalur ini tanpa mengubah kode.
 FOLDER_HF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "video_hf")
-BATAS_RENDER = 900            # detik; render di runner GitHub biasanya beberapa menit
+BATAS_RENDER = 1800           # detik; render di runner GitHub biasanya beberapa menit
 
 
 def _muat_rakit():
