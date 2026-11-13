@@ -10,6 +10,7 @@ Video animasi (utama) butuh Node.js 22+ dan ffmpeg/ffprobe di PATH; lihat video_
 Kalau tidak tersedia, otomatis memakai video slide Pillow.
 """
 
+import base64
 import math
 import os
 import random
@@ -28,7 +29,7 @@ HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
 
 W, H = 1080, 1920
-FPS = 30
+FPS = 60
 DURASI = {"pembuka": 2.6, "game": 3.2, "gratis": 3.2, "penutup": 3.4}
 TRANSISI = 0.35
 MAKS_GAME = 5
@@ -570,19 +571,30 @@ def _ringkas(e, maks=300):
     return teks if len(teks) <= maks else teks[:maks] + "…"
 
 
-# ---------- Suara TTS otomatis: ElevenLabs, cadangan Microsoft Edge TTS ----------
-# Urutan: ElevenLabs (kalau secret ELEVENLABS_API_KEY ada) -> Microsoft Edge TTS (gratis, tanpa API key)
-# -> tanpa suara. Suara ElevenLabs bawaan Iwan, ganti lewat ELEVENLABS_VOICE_ID (biaya ~1 kredit per huruf).
-# Suara Edge bawaan id-ID-ArdiNeural, ganti lewat EDGE_TTS_VOICE (mis. id-ID-GadisNeural).
+# ---------- Suara TTS otomatis: ElevenLabs, Gemini TTS, cadangan Microsoft Edge TTS ----------
+# Urutan bawaan: ElevenLabs -> Gemini TTS -> Microsoft Edge TTS -> tanpa suara. Penyedia yang API key-nya
+# tidak diset dilewati. Urutan bisa diganti lewat variabel URUTAN_TTS, mis. "gemini,edge" (Gemini dulu,
+# ElevenLabs tidak dipakai) atau "gemini,elevenlabs,edge".
+# - ElevenLabs: secret ELEVENLABS_API_KEY. Suara bawaan Iwan, ganti lewat ELEVENLABS_VOICE_ID (~1 kredit per huruf).
+# - Gemini TTS: secret GEMINI_API_KEY (gratis dari Google AI Studio). Suara lewat GEMINI_TTS_VOICE,
+#   gaya bicara lewat GEMINI_TTS_GAYA. Paket gratis hanya beberapa permintaan per menit, jadi ada jeda antar klip.
+# - Microsoft Edge TTS: gratis, tanpa API key. Suara bawaan id-ID-ArdiNeural, ganti lewat EDGE_TTS_VOICE.
 SUARA_BAWAAN = "1kNciG1jHVSuFBPoxdRZ"       # "Iwan - Informative, Authentic and Clear"
 SUARA_EDGE = "id-ID-ArdiNeural"
 MODEL_TTS = "eleven_multilingual_v2"
+URUTAN_TTS = "elevenlabs,gemini,edge"
+MODEL_GEMINI = "gemini-3.1-flash-tts-preview"
+SUARA_GEMINI = "Puck"                        # ceria; lainnya mis. Charon (informatif), Kore (tegas), Fenrir (bersemangat)
+# Arahan gaya untuk Gemini (tidak ikut dibacakan). Ganti lewat GEMINI_TTS_GAYA.
+GAYA_GEMINI = ("Bacakan dalam bahasa Indonesia sehari-hari dengan gaya kreator konten game di TikTok: "
+               "bersemangat, akrab, natural, tempo agak cepat, tanpa terdengar seperti pembaca berita")
+JEDA_GEMINI = 21            # detik antar permintaan: paket gratis sekitar 3 permintaan per menit
 RAPIKAN_SUARA = ("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03,areverse,"
                  "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03,areverse,"
                  "loudnorm=I={keras}:TP=-1.5:LRA=11")
 # Target keras per klip supaya video jadi sekitar -14 LUFS (standar TikTok). Suara Edge lebih padat,
 # jadi targetnya lebih rendah.
-KERAS_ELEVENLABS, KERAS_EDGE = -15, -17.5
+KERAS_ELEVENLABS, KERAS_GEMINI, KERAS_EDGE = -15, -15, -17.5
 
 
 def _teks_tts(teks):
@@ -610,6 +622,66 @@ def _tts_elevenlabs(teks, api_key, voice_id, session=None):
         return r.content
 
 
+_gemini_terakhir = [0.0]    # waktu permintaan Gemini terakhir, untuk menjaga jeda antar klip
+
+
+def _pcm_ke_wav(pcm, hz=24000):
+    """Gemini mengembalikan PCM mentah (16-bit, mono); bungkus jadi WAV supaya ffmpeg bisa membacanya."""
+    wadah = BytesIO()
+    with wave.open(wadah, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(hz)
+        w.writeframes(pcm)
+    return wadah.getvalue()
+
+
+def _tts_gemini(teks, api_key, voice, gaya, session=None):
+    """Gemini TTS (Google AI Studio): gratis dengan batas permintaan. Kembalikan audio WAV."""
+    model = os.environ.get("GEMINI_TTS_MODEL", "").strip() or MODEL_GEMINI
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    isi = {"contents": [{"parts": [{"text": f"{gaya}: {teks}" if gaya else teks}]}],
+           "generationConfig": {"responseModalities": ["AUDIO"],
+                                "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}}}
+    try:
+        jeda = float(os.environ.get("GEMINI_TTS_JEDA", "").strip() or JEDA_GEMINI)
+    except ValueError:
+        jeda = JEDA_GEMINI
+    galat = "tidak ada jawaban"
+    for coba in range(4):
+        tunggu = _gemini_terakhir[0] + jeda - time.monotonic()
+        if tunggu > 0:
+            time.sleep(tunggu)
+        _gemini_terakhir[0] = time.monotonic()
+        r = (session or requests).post(url, timeout=120, json=isi,
+                                       headers={"x-goog-api-key": api_key, "content-type": "application/json"})
+        if r.status_code >= 400:
+            try:
+                err = r.json().get("error", {})
+            except ValueError:
+                err = {}
+            galat = f"Gemini HTTP {r.status_code}: {err.get('message') or r.text[:200] or r.reason}"
+            rincian = str(err.get("details", ""))
+            if r.status_code == 429 and "PerDay" not in rincian and coba < 3:
+                # Batas per menit: tunggu sesuai saran Google (retryDelay), lalu coba lagi
+                saran = re.search(r"retryDelay'?\"?:\s*'?\"?([\d.]+)s", rincian)
+                time.sleep(min(float(saran.group(1)) + 1 if saran else 30, 65))
+                continue
+            if r.status_code in (500, 502, 503, 504) and coba < 3:
+                time.sleep(5 * (coba + 1))
+                continue
+            raise RuntimeError(galat)      # termasuk jatah harian habis: langsung pindah ke penyedia berikutnya
+        try:
+            bagian = r.json()["candidates"][0]["content"]["parts"]
+            data = next(b["inlineData"] for b in bagian if b.get("inlineData", {}).get("data"))
+        except (ValueError, KeyError, IndexError, TypeError, StopIteration):
+            galat = "Gemini tidak mengembalikan audio"     # kadang terjadi di model pratinjau: coba lagi
+            continue
+        hz = re.search(r"rate=(\d+)", data.get("mimeType", ""))
+        return _pcm_ke_wav(base64.b64decode(data["data"]), int(hz.group(1)) if hz else 24000)
+    raise RuntimeError(galat)
+
+
 def _tts_edge(teks, voice):
     """Microsoft Edge TTS (paket edge-tts): gratis, tanpa API key. Kembalikan audio MP3."""
     import asyncio
@@ -630,7 +702,8 @@ def _tts_edge(teks, voice):
 
 def buat_suara(segmen, ada_gratis, session=None):
     """Satu klip per adegan, dibuat berurutan. Hening di awal/akhir dipotong dan keras disamakan.
-    Coba ElevenLabs dulu (bila ada API key), lalu Microsoft Edge TTS sebagai cadangan.
+    Penyedia dicoba menurut URUTAN_TTS (bawaan: ElevenLabs, Gemini TTS, Microsoft Edge TTS); yang API key-nya
+    kosong dilewati, dan kalau satu gagal lanjut ke berikutnya (pemilik dikabari).
     Kembalikan {"pembuka": {file, durasi}, "game": [...], "gratis": ..., "penutup": ...}.
     Melempar exception kalau semua penyedia suara gagal."""
     import shutil
@@ -640,17 +713,18 @@ def buat_suara(segmen, ada_gratis, session=None):
               + ([("gratis", segmen["gratis"])] if ada_gratis and segmen["gratis"] else [])
               + [("penutup", segmen["penutup"])])
 
-    def rakit(buat_mp3, keras):
+    def rakit(buat_audio, keras):
         shutil.rmtree(folder, ignore_errors=True)
         os.makedirs(folder)
         klip = {}
         for nama, teks in daftar:
-            mp3, wav = os.path.join(folder, nama + ".mp3"), os.path.join(folder, nama + ".wav")
-            with open(mp3, "wb") as f:
-                f.write(buat_mp3(_teks_tts(teks)))
-            subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", mp3, "-af", RAPIKAN_SUARA.format(keras=keras),
+            # Berkas sumber bisa MP3 (ElevenLabs, Edge) atau WAV (Gemini); ffmpeg mengenali dari isinya
+            sumber, wav = os.path.join(folder, nama + ".sumber"), os.path.join(folder, nama + ".wav")
+            with open(sumber, "wb") as f:
+                f.write(buat_audio(_teks_tts(teks)))
+            subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", sumber, "-af", RAPIKAN_SUARA.format(keras=keras),
                             "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", wav], check=True)
-            os.remove(mp3)
+            os.remove(sumber)
             with wave.open(wav) as w:
                 durasi = w.getnframes() / w.getframerate()
             klip[nama] = {"file": f"assets/suara/{nama}.wav", "durasi": round(durasi, 3)}
@@ -658,21 +732,38 @@ def buat_suara(segmen, ada_gratis, session=None):
                 "game": [klip[f"game-{i}"] for i in range(1, len(segmen["game"]) + 1)],
                 "gratis": klip.get("gratis"), "penutup": klip["penutup"]}
 
-    suara_edge = os.environ.get("EDGE_TTS_VOICE", "").strip() or SUARA_EDGE
-    api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
-    if api_key:
-        voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "").strip() or SUARA_BAWAAN
+    def env(nama, bawaan=""):
+        return os.environ.get(nama, "").strip() or bawaan
+
+    kunci_el, kunci_gemini = env("ELEVENLABS_API_KEY"), env("GEMINI_API_KEY")
+    suara_el, suara_gemini, suara_edge = (env("ELEVENLABS_VOICE_ID", SUARA_BAWAAN), env("GEMINI_TTS_VOICE", SUARA_GEMINI),
+                                          env("EDGE_TTS_VOICE", SUARA_EDGE))
+    gaya = env("GEMINI_TTS_GAYA", GAYA_GEMINI)
+    penyedia = {
+        "elevenlabs": (kunci_el, f"ElevenLabs {suara_el}", KERAS_ELEVENLABS,
+                       lambda t: _tts_elevenlabs(t, kunci_el, suara_el, session)),
+        "gemini": (kunci_gemini, f"Gemini TTS {suara_gemini}", KERAS_GEMINI,
+                   lambda t: _tts_gemini(t, kunci_gemini, suara_gemini, gaya, session)),
+        "edge": (True, f"Microsoft Edge {suara_edge}", KERAS_EDGE, lambda t: _tts_edge(t, suara_edge)),
+    }
+    urutan = [n for n in re.split(r"[,\s]+", env("URUTAN_TTS", URUTAN_TTS).lower()) if n in penyedia]
+    aktif = [n for n in dict.fromkeys(urutan or URUTAN_TTS.split(",")) if penyedia[n][0]]
+    if not aktif:
+        raise RuntimeError("tidak ada penyedia suara yang aktif (cek URUTAN_TTS dan API key)")
+    for i, nama in enumerate(aktif):
+        _, label, keras, buat_audio = penyedia[nama]
         try:
-            suara = rakit(lambda t: _tts_elevenlabs(t, api_key, voice_id, session), KERAS_ELEVENLABS)
-            print(f"Suara TTS siap (ElevenLabs {voice_id}, sekitar {sum(len(t) for _, t in daftar)} kredit).")
-            return suara
+            suara = rakit(buat_audio, keras)
         except Exception as e:
-            print(f"Suara ElevenLabs gagal, pakai suara cadangan Microsoft Edge: {e}")
-            _kabari_pemilik(f"⚠️ Suara ElevenLabs gagal, video memakai suara cadangan Microsoft Edge "
-                            f"({suara_edge}): {_ringkas(e)}")
-    suara = rakit(lambda t: _tts_edge(t, suara_edge), KERAS_EDGE)
-    print(f"Suara TTS siap (Microsoft Edge {suara_edge}).")
-    return suara
+            if i == len(aktif) - 1:
+                raise
+            berikut = penyedia[aktif[i + 1]][1]
+            print(f"Suara {label} gagal, pakai suara cadangan {berikut}: {e}")
+            _kabari_pemilik(f"⚠️ Suara {label} gagal, video memakai suara cadangan {berikut}: {_ringkas(e)}")
+            continue
+        kredit = f", sekitar {sum(len(t) for _, t in daftar)} kredit" if nama == "elevenlabs" else ""
+        print(f"Suara TTS siap ({label}{kredit}).")
+        return suara
 
 
 BATAS_TELEGRAM_MB = 45      # bot Telegram hanya bisa mengunggah file sampai 50 MB; sisakan ruang aman
@@ -945,7 +1036,7 @@ def buat_video(steam, epic, path_mp4="video_harian.mp4", username_bot="", link_c
     sekarang = datetime.now(WIB)
     segmen, acak = susun_teks(steam, epic, sekarang)
 
-    # Utama: video animasi HyperFrames + suara TTS (ElevenLabs, cadangan Edge). Cadangan video: slide Pillow tanpa suara.
+    # Utama: video animasi HyperFrames + suara TTS (ElevenLabs, Gemini, cadangan Edge). Cadangan video: slide Pillow tanpa suara.
     durasi, dengan_suara = None, False
     if os.environ.get("VIDEO_HYPERFRAMES", "1") != "0":
         try:
@@ -955,7 +1046,7 @@ def buat_video(steam, epic, path_mp4="video_harian.mp4", username_bot="", link_c
                 suara = buat_suara(segmen, bool(epic), session)
             except Exception as e:
                 print(f"Suara TTS gagal, video dibuat tanpa suara: {e}")
-                _kabari_pemilik(f"⚠️ Video hari ini dibuat TANPA suara (ElevenLabs dan Microsoft Edge gagal): {_ringkas(e)}")
+                _kabari_pemilik(f"⚠️ Video hari ini dibuat TANPA suara (semua penyedia suara gagal): {_ringkas(e)}")
             durasi, dengan_suara = rakit_mp4_hyperframes(steam, epic, segmen, sekarang, username_bot,
                                                          link_channel, path_mp4, session, suara)
             print(f"Video HyperFrames selesai ({durasi:.1f} detik, {'dengan' if dengan_suara else 'tanpa'} suara).")
