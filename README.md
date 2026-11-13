@@ -15,7 +15,7 @@ Awalnya cuma bot kecil yang posting ke Telegram. Lama-lama nambah situs, halaman
 
 ## Apa yang terjadi tiap sore
 
-Workflow jalan tiap hari sekitar jam 17.17 WIB (jadwal GitHub kadang telat sedikit). Urutannya kira-kira begini:
+Workflow jalan tiap hari sekitar jam 04.47 WIB (jadwal GitHub kadang telat sedikit). Urutannya kira-kira begini:
 
 1. Ambil kandidat diskon dari CheapShark, lalu cek harga Rupiah-nya satu per satu ke Steam Indonesia.
 2. Ambil daftar game gratis (dan yang akan gratis) dari Epic.
