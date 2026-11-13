@@ -2,7 +2,7 @@ name: Radar Diskon Game
 
 on:
   schedule:
-    - cron: "17 10 * * *"   # 10:17 UTC = 17:17 WIB (sengaja bukan jam bulat supaya tidak antre lama)
+    - cron: "47 21 * * *"   # 21:47 UTC = 04:47 WIB keesokan harinya, supaya video siap sekitar pukul 5 pagi (bukan jam bulat supaya tidak antre lama)
   workflow_dispatch:        # tombol "Run workflow" untuk tes manual
 
 permissions:
@@ -52,10 +52,17 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_OWNER_ID: ${{ secrets.TELEGRAM_OWNER_ID }}
-          # Suara TTS untuk video: ElevenLabs bila secret ini ada, kalau gagal/kosong pakai Microsoft Edge TTS
+          # Suara TTS untuk video. Urutan bawaan: ElevenLabs -> Gemini TTS -> Microsoft Edge TTS.
+          # Penyedia yang secret-nya kosong dilewati. Ganti urutan lewat variabel URUTAN_TTS,
+          # mis. "gemini,edge" (Gemini dulu, ElevenLabs tidak dipakai).
+          URUTAN_TTS: ${{ vars.URUTAN_TTS }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}   # kosong = suara Iwan
-          # Suara cadangan gratis (Microsoft Edge TTS) bila ElevenLabs gagal/tidak diset; kosong = id-ID-ArdiNeural
+          # Gemini TTS (gratis, API key dari Google AI Studio). Kosong = suara Puck dan gaya bawaan di video.py
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_TTS_VOICE: ${{ vars.GEMINI_TTS_VOICE }}
+          GEMINI_TTS_GAYA: ${{ vars.GEMINI_TTS_GAYA }}
+          # Cadangan terakhir tanpa API key (Microsoft Edge TTS); kosong = id-ID-ArdiNeural
           EDGE_TTS_VOICE: ${{ vars.EDGE_TTS_VOICE }}
         run: python radar_diskon.py
 
