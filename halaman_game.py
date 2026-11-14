@@ -6,6 +6,8 @@ Dari data harga_idr.json dibuat:
   docs/game/index.html                  -> daftar semua game yang dipantau
 
 Isi halaman game hanya berubah kalau harganya berubah, supaya upload harian tetap ringan.
+Karena itu kalimat di halaman tidak memuat hitungan yang berganti tiap hari (mis. "sudah 49 hari");
+perbandingan antar game dibulatkan supaya tidak ikut berubah setiap ada game baru.
 Game yang datanya masih sedikit diberi tanda "noindex" dan belum masuk sitemap,
 supaya Google tidak menilai situs ini penuh halaman tipis.
 """
@@ -13,9 +15,10 @@ supaya Google tidak menilai situs ini penuh halaman tipis.
 import json
 import os
 import re
+import sys
 import unicodedata
 import zlib
-from datetime import datetime
+from datetime import datetime, timedelta
 from html import escape
 
 from gaya import USERNAME_BOT_ALARM, halaman_utuh, kepala, pita, tulis_css
@@ -31,6 +34,8 @@ except Exception as err:          # afiliasi.py bermasalah: halaman tetap dibuat
 
 MIN_HARI_INDEKS = 14        # halaman game boleh diindeks Google setelah datanya >= sekian hari
 BATAS_TIDAK_DIPANTAU = 3    # kalau tidak dicek selama > sekian hari, tampilkan pemberitahuan
+MIN_GAME_PER_GENRE = 20     # perbandingan harga segenre hanya ditampilkan kalau genrenya berisi >= sekian game
+MAKS_KUTIPAN_STEAM = 220    # panjang kutipan deskripsi resmi Steam (huruf); sisanya dibaca di Steam
 
 
 # ---------- Alamat halaman ----------
@@ -141,6 +146,23 @@ def _huruf_kecil(teks):
     return " ".join(w if (w in _TETAP or w.isupper()) else w.lower() for w in teks.split())
 
 
+def _kutipan_pendek(teks, maks=MAKS_KUTIPAN_STEAM):
+    """Ambil satu-dua kalimat pertama deskripsi Steam. Deskripsi lengkapnya sama persis dengan yang ada
+    di Steam dan situs lain, jadi di sini cukup cuplikannya."""
+    teks = " ".join((teks or "").split())
+    if len(teks) <= maks:
+        return teks
+    kalimat = re.split(r"(?<=[.!?])\s+", teks)
+    hasil = kalimat[0]
+    for k in kalimat[1:]:
+        if len(hasil) >= 80 or len(hasil) + 1 + len(k) > maks:
+            break
+        hasil += " " + k
+    if len(hasil) > maks:
+        hasil = hasil[:maks].rsplit(" ", 1)[0].rstrip(",;:") + "…"
+    return hasil
+
+
 def _bagian_tentang(r):
     """Tentang game: kalimat Indonesia dari data toko Steam + deskripsi resmi + fakta."""
     info, nama = r["info"], r["nama"]
@@ -158,8 +180,9 @@ def _bagian_tentang(r):
     kalimat += "."
     if info.get("fitur"):
         kalimat += f" Fitur yang tercantum di Steam antara lain {_gabung([_huruf_kecil(f) for f in info['fitur'][:4]])}."
-    kutipan = (f'\n      <p>Deskripsi resmi di halaman Steam:</p>\n      <blockquote lang="en"><p>{escape(info["deskripsi"])}</p></blockquote>'
-               if info.get("deskripsi") else "")
+    cuplikan = _kutipan_pendek(info.get("deskripsi"))
+    kutipan = (f'\n      <p>Cuplikan deskripsi resmi di Steam:</p>\n      <blockquote lang="en"><p>{escape(cuplikan)}</p></blockquote>'
+               if cuplikan else "")
     fakta = [(k, v) for k, v in (("Genre", ", ".join(info.get("genre") or [])),
                                  ("Developer", ", ".join(info.get("developer") or [])),
                                  ("Publisher", ", ".join(info.get("publisher") or [])),
@@ -175,30 +198,145 @@ def _bagian_tentang(r):
     </section>"""
 
 
-def _bagian_ringkasan(r, hari_ini):
-    """Ringkasan riwayat harga dalam kalimat, dihitung dari data pantauan sendiri."""
-    nama, kini, normal = r["nama"], r["harga_kini"], r["normal"]
-    hari = max(1, _hari_sejak(r["mulai"], hari_ini))
-    p = [f"Kami memantau harga {nama} di Steam Indonesia setiap hari sejak {_tgl(r['mulai'])} ({hari} hari)."]
-    if r["jumlah_perubahan"] == 0:
-        p.append(f"Selama itu harganya belum pernah berubah, tetap {_rupiah(kini)}"
-                 + (f" (diskon {r['diskon_kini']}% dari harga normal {_rupiah(normal)})." if r["diskon_kini"] and normal else "."))
-    else:
-        p.append(f"Dalam periode itu harganya berubah {r['jumlah_perubahan']} kali.")
-        if r["diskon_maks"]:
-            p.append(f"Diskon terbesar yang pernah tercatat adalah {r['diskon_maks']}%.")
-        p.append(f"Harga termurahnya {_rupiah(r['harga_terendah'])} pada {_tgl(r['tgl_terendah'])}.")
-        if kini <= r["harga_terendah"]:
-            p.append("Harga hari ini sama dengan harga termurah itu, jadi ini saat yang baik untuk membeli.")
+def _periode_diskon(riwayat):
+    """Periode diskon yang tercatat, urut dari yang paling lama:
+    (tgl_mulai, tgl_selesai atau None kalau masih berlangsung, diskon_terbesar, harga_termurah)."""
+    periode, buka = [], None
+    for tgl, harga, dsk in riwayat:
+        if dsk > 0:
+            if buka is None:
+                buka = [tgl, None, dsk, harga]
+            else:
+                buka[2], buka[3] = max(buka[2], dsk), min(buka[3], harga)
+        elif buka is not None:
+            buka[1] = tgl
+            periode.append(tuple(buka))
+            buka = None
+    if buka is not None:
+        periode.append(tuple(buka))
+    return periode
+
+
+def _harga_saat_event(r, ev):
+    """Harga termurah game ini selama satu event sale.
+    Kembalikan (harga, diskon) kalau diskon, (None, 0) kalau dipantau tapi tidak diskon,
+    atau None kalau game ini belum dipantau saat event itu."""
+    try:
+        # Sale Steam mulai dan selesai pukul 10.00 waktu Pasifik (sekitar tengah malam WIB). Jadi pengecekan
+        # harian bot yang jatuh di dalam masa sale adalah tanggal WIB sehari setelah "mulai" sampai "selesai".
+        awal = (datetime.strptime(ev["mulai"], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        akhir = ev["selesai"]
+    except (KeyError, TypeError, ValueError):
+        return None
+    if r["mulai"] > akhir or awal > akhir:
+        return None
+    sebelum = [e for e in r["riwayat"] if e[0] <= awal]       # harga yang berlaku di hari pertama sale
+    berlaku = sebelum[-1:] + [e for e in r["riwayat"] if awal < e[0] <= akhir]
+    diskon = [e for e in berlaku if e[2] > 0]
+    if diskon:
+        terbaik = min(diskon, key=lambda e: e[1])
+        return terbaik[1], terbaik[2]
+    return (None, 0) if r["mulai"] <= awal else None
+
+
+def _baris_event(r, hari_ini, event_sale):
+    """Kalimat per event sale yang sudah dimulai: berapa harga game ini saat itu."""
+    baris = []
+    for ev in event_sale or ():
+        try:
+            if datetime.strptime(ev["mulai"], "%Y-%m-%d").date() > hari_ini:
+                continue
+        except (KeyError, TypeError, ValueError):
+            continue
+        hasil = _harga_saat_event(r, ev)
+        if hasil is None:
+            continue
+        harga, dsk = hasil
+        waktu = f"{_tgl(ev['mulai'])} sampai {_tgl(ev['selesai'])}"
+        if harga is None:
+            baris.append(f"{ev['nama']} ({waktu}): tidak ikut diskon.")
         else:
-            selisih = kini - r["harga_terendah"]
-            p.append(f"Harga hari ini masih {_rupiah(selisih)} lebih mahal dari harga termurahnya.")
-    if hari < 60:
-        p.append("Riwayat ini masih pendek. Makin lama dipantau, makin jelas pola diskonnya, misalnya seberapa besar potongan saat Steam Sale.")
+            baris.append(f"{ev['nama']} ({waktu}): {_rupiah(harga)}, diskon {dsk}%.")
+    return baris
+
+
+def _banding_genre(r, harga_genre):
+    """Posisi harga hari ini di antara game segenre. Dibulatkan ke persepuluhan supaya kalimatnya
+    tidak berubah setiap ada game baru atau harga game lain bergeser sedikit."""
+    pilihan = [(len(harga_genre[g]), g) for g in (r["info"].get("genre") or [])
+               if len(harga_genre.get(g, ())) >= MIN_GAME_PER_GENRE]
+    if not pilihan:
+        return ""
+    _, genre = min(pilihan)                      # genre paling spesifik (paling sedikit gamenya)
+    lain = harga_genre[genre]
+    lebih_mahal = sum(1 for h in lain if h > r["harga_kini"])
+    lebih_murah = sum(1 for h in lain if h < r["harga_kini"])
+    nama_genre = _huruf_kecil(genre)
+    if lebih_mahal >= lebih_murah:
+        n = round(lebih_mahal * 10 / len(lain))
+        if n >= 10:
+            return f"Harga hari ini termasuk yang paling murah di antara game {nama_genre} yang kami pantau."
+        if n >= 6:
+            return f"Harga hari ini lebih murah dari sekitar {n} dari 10 game {nama_genre} yang kami pantau."
+    else:
+        n = round(lebih_murah * 10 / len(lain))
+        if n >= 10:
+            return f"Harga hari ini termasuk yang paling mahal di antara game {nama_genre} yang kami pantau."
+        if n >= 6:
+            return f"Harga hari ini lebih mahal dari sekitar {n} dari 10 game {nama_genre} yang kami pantau."
+    return f"Harga hari ini berada di kisaran tengah game {nama_genre} yang kami pantau."
+
+
+def _bagian_saran(r, hari_ini, konteks=None):
+    """Beli sekarang atau tunggu: kesimpulan dan alasannya, dihitung dari data pantauan sendiri."""
+    konteks = konteks or {}
+    nama, kini = r["nama"], r["harga_kini"]
+    terendah, tgl_terendah = r["harga_terendah"], _tgl(r["tgl_terendah"])
+    periode = _periode_diskon(r["riwayat"])
+    if r["diskon_kini"] > 0 and not r["pernah_berubah"]:
+        saran = "Sedang diskon."
+        alasan = (f"{nama} diskon {r['diskon_kini']}% menjadi {_rupiah(kini)}. Harganya belum berubah sejak kami pantau, "
+                  f"jadi belum ada harga lain sebagai pembanding.")
+    elif r["diskon_kini"] > 0 and kini <= terendah:
+        saran = "Beli sekarang."
+        alasan = (f"Harga hari ini, {_rupiah(kini)} (diskon {r['diskon_kini']}%), adalah harga termurah "
+                  f"yang pernah kami catat untuk {nama}.")
+    elif r["diskon_kini"] > 0:
+        selisih = kini - terendah
+        if selisih * 10 <= kini:
+            saran = "Layak dibeli."
+            alasan = (f"Harga hari ini {_rupiah(kini)} (diskon {r['diskon_kini']}%), hanya {_rupiah(selisih)} di atas "
+                      f"harga termurah yang pernah kami catat ({_rupiah(terendah)} pada {tgl_terendah}).")
+        else:
+            saran = "Bisa menunggu."
+            alasan = (f"{nama} memang sedang diskon {r['diskon_kini']}% menjadi {_rupiah(kini)}, tetapi pernah "
+                      f"{_rupiah(selisih)} lebih murah: {_rupiah(terendah)} pada {tgl_terendah}.")
+    elif r["pernah_berubah"] and terendah < kini:
+        saran = "Tunggu diskon."
+        potongan = f" (diskon {r['diskon_terendah']}%)" if r["diskon_terendah"] else ""
+        alasan = (f"Hari ini {nama} dijual {_rupiah(kini)} tanpa diskon, padahal pernah turun ke "
+                  f"{_rupiah(terendah)}{potongan} pada {tgl_terendah}.")
+    else:
+        saran = "Belum ada pola diskon."
+        alasan = f"Sejak kami pantau, {nama} belum pernah lebih murah dari {_rupiah(kini)}."
+
+    pantau = f"Kami memantau harga {nama} di Steam Indonesia setiap hari sejak {_tgl(r['mulai'])}."
+    if periode:
+        pantau += f" Selama itu tercatat {len(periode)} kali diskon, yang terbesar {r['diskon_maks']}%."
+    banding = _banding_genre(r, konteks.get("harga_genre") or {})
+    if banding:
+        pantau += " " + banding
+
+    event = _baris_event(r, hari_ini, konteks.get("event_sale"))
+    daftar_event = ""
+    if event:
+        daftar_event = ("\n      <p>Harga saat event sale:</p>\n      <ul>"
+                        + "".join(f"<li>{escape(b)}</li>" for b in event) + "</ul>")
     return f"""
-    <section class="bagian prosa" aria-labelledby="h-ringkas">
-      <h2 id="h-ringkas">Ringkasan harga {escape(nama)}</h2>
-      <p>{escape(" ".join(p))}</p>
+    <section class="bagian prosa" aria-labelledby="h-saran">
+      <h2 id="h-saran">Beli {escape(nama)} sekarang atau tunggu?</h2>
+      <p><strong>{escape(saran)}</strong> {escape(alasan)}</p>
+      <p>{escape(pantau)}</p>{daftar_event}
     </section>"""
 
 
@@ -210,9 +348,18 @@ def _bagian_tanya(r):
         j1 = f"Tidak. Hari ini {nama} dijual dengan harga normal {_rupiah(kini)} di Steam Indonesia."
     j2 = (f"Harga termurah yang pernah kami catat adalah {_rupiah(r['harga_terendah'])}"
           + (f" (diskon {r['diskon_terendah']}%)" if r["diskon_terendah"] else "") + f", pada {_tgl(r['tgl_terendah'])}.")
-    j3 = ("Tidak ada yang tahu pasti, karena developer menentukan sendiri jadwal diskonnya. "
-          "Diskon besar biasanya muncul saat Steam Sale musiman. Lihat jadwalnya di halaman Jadwal Steam Sale, "
-          "atau pasang alarm harga supaya dikabari begitu harganya turun.")
+    periode = _periode_diskon(r["riwayat"])
+    if not periode:
+        j3 = f"Belum bisa diperkirakan. Sejak kami pantau, {nama} belum pernah diskon."
+    else:
+        mulai, selesai, dsk, _ = periode[-1]
+        if selesai is None:
+            j3 = f"{nama} sedang diskon sekarang. Diskon {dsk}% ini tercatat sejak {_tgl(mulai)}."
+        else:
+            j3 = f"Diskon terakhir yang kami catat sebesar {dsk}%, dari {_tgl(mulai)} sampai {_tgl(selesai)}."
+        if len(periode) > 1:
+            j3 += f" Sejak dipantau, game ini sudah {len(periode)} kali diskon."
+    j3 += " Pasang alarm harga supaya dikabari begitu harganya turun."
     tanya = [(f"Apakah {nama} sedang diskon di Steam?", j1),
              (f"Berapa harga termurah {nama} di Steam Indonesia?", j2),
              (f"Kapan {nama} diskon lagi?", j3)]
@@ -248,7 +395,7 @@ def _bagian_terkait(r, aktif):
     </section>"""
 
 
-def _html_game(r, situs, link_telegram, hari_ini, aktif=()):
+def _html_game(r, situs, link_telegram, hari_ini, aktif=(), konteks=None):
     url = situs + jalur_game(r["appid"], r["slug"])
     nama = r["nama"]
     gambar = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{r['appid']}/header.jpg"
@@ -325,10 +472,10 @@ def _html_game(r, situs, link_telegram, hari_ini, aktif=()):
       <div><dt>Harga normal</dt><dd>{fakta_normal}</dd></div>
       <div><dt>Termurah tercatat</dt><dd>{fakta_terendah}</dd></div>
       <div><dt>Dipantau sejak</dt><dd>{_tgl(r['mulai'])}</dd></div>
-    </dl>{_bagian_ringkasan(r, hari_ini)}{blok_halaman_game(kini)}{_bagian_tentang(r)}
+    </dl>{_bagian_saran(r, hari_ini, konteks)}{blok_halaman_game(kini)}{_bagian_tentang(r)}
     <section class="struk" aria-labelledby="h-riwayat">
       <h2 id="h-riwayat">Riwayat harga</h2>
-      <p class="catatan">Setiap baris adalah hari ketika harganya berubah. Dicek setiap hari.</p>
+      <p class="catatan">Satu baris per perubahan harga.</p>
       <table>
         <thead><tr><th scope="col">Tanggal</th><th scope="col" class="angka">Diskon</th><th scope="col" class="angka">Harga</th></tr></thead>
         <tbody>{"".join(baris)}</tbody>
@@ -414,9 +561,13 @@ def _tulis_data_harga(semua, folder):
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
 
 
-def buat_halaman_game(riwayat, folder="docs", link_telegram=""):
+def buat_halaman_game(riwayat, folder="docs", link_telegram="", event_sale=None):
     """Buat semua halaman game + halaman daftar.
+    event_sale: daftar EVENT_SALE dari radar_diskon.py, untuk kalimat "harga saat event sale".
+    Kalau tidak diberikan, diambil dari skrip yang sedang berjalan (radar_diskon.py).
     Kembalikan daftar (url, lastmod) halaman yang boleh diindeks, untuk sitemap."""
+    if event_sale is None:
+        event_sale = getattr(sys.modules.get("__main__"), "EVENT_SALE", None) or ()
     situs = url_situs()
     if not situs:
         return []
@@ -429,9 +580,15 @@ def buat_halaman_game(riwayat, folder="docs", link_telegram=""):
             semua.append(r)
     # Game yang sedang diskon dan masih dicek harian, untuk bagian "Game lain yang sedang diskon"
     aktif = [r for r in semua if r["diskon_kini"] > 0 and _hari_sejak(r["cek"], hari_ini) <= BATAS_TIDAK_DIPANTAU]
+    # Harga hari ini semua game per genre, untuk kalimat perbandingan segenre
+    harga_genre = {}
+    for r in semua:
+        for genre in r["info"].get("genre") or []:
+            harga_genre.setdefault(genre, []).append(r["harga_kini"])
+    konteks = {"event_sale": event_sale, "harga_genre": harga_genre}
     for r in semua:
         appid = r["appid"]
-        url, html, noindex = _html_game(r, situs, link_telegram, hari_ini, aktif)
+        url, html, noindex = _html_game(r, situs, link_telegram, hari_ini, aktif, konteks)
         path = os.path.join(folder, jalur_game(appid, r["slug"]), "index.html")
         jumlah_berubah += _tulis_jika_berubah(path, html)
         if not noindex:
