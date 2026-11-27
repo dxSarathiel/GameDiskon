@@ -145,5 +145,16 @@
    "gambar": "https://cdn1.epicgames.com/spt-assets/545b4dd8bb364c12b719268198a93ef3/bread-and-fred-3jnwn.jpg",
    "deskripsi": "Grab your best bud for help in this new co-op challenge to help two adorable penguins, Bread and Fred, reach the top of the snowy summit. Time your jumps, cling to walls and swing across gaps to see how far you can make it before you tumble all the way back down the mountain."
   }
+ ],
+ "2026-12-03": [
+  {
+   "judul": "Strange Antiquities",
+   "mulai": "2026-12-03T16:00:00.000Z",
+   "berakhir": "2026-12-10T16:00:00.000Z",
+   "dicatat": "2026-11-27",
+   "url": "https://store.epicgames.com/p/strange-antiquities-e37660",
+   "gambar": "https://cdn1.epicgames.com/spt-assets/d0e3b7c3690c485ca7a435d298262ab2/strange-antiquities-1kl5s.png",
+   "deskripsi": "Strange Antiquities is a game set in Undermere, where you explore occult artifacts and solve dark mysteries. As an apprentice thaumaturge, you'll identify magical items and help townsfolk. A sequel to Strange Horticulture, it blends exploration to uncover strange secrets."
+  }
  ]
 }
